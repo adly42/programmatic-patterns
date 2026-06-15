@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Bubble Background Generator</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #111;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px;
+    gap: 16px;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    min-height: 100vh;
+  }
+  canvas {
+    max-width: 100%;
+    border-radius: 10px;
+    box-shadow: 0 12px 48px rgba(0,0,0,0.5);
+  }
+  .controls {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+  }
+  button {
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: none;
+    background: #007AFF;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  button:hover { background: #0066dd; }
+  button.ghost { background: #2c2c2e; color: #ccc; }
+  button.ghost:hover { background: #3a3a3c; }
+
+  .seg {
+    display: flex;
+    background: #2c2c2e;
+    border-radius: 8px;
+    padding: 3px;
+    gap: 2px;
+  }
+  .seg button {
+    background: transparent;
+    color: #666;
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-size: 13px;
+    transition: background 0.1s, color 0.1s;
+  }
+  .seg button.on { background: #48484a; color: #fff; }
+
+  .opt-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .opt-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #777;
+    font-size: 12px;
+  }
+  .opt-item span.val {
+    color: #aaa;
+    font-size: 12px;
+    min-width: 28px;
+    text-align: right;
+  }
+  input[type="color"] {
+    -webkit-appearance: none;
+    width: 28px; height: 28px;
+    border: none; border-radius: 6px;
+    cursor: pointer; padding: 0; background: none;
+  }
+  input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+  input[type="color"]::-webkit-color-swatch { border-radius: 5px; border: 2px solid #444; }
+  input[type="range"] {
+    width: 80px;
+    accent-color: #007AFF;
+    cursor: pointer;
+  }
+  .divider { width: 1px; height: 26px; background: #2e2e2e; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div class="controls">
+  <button onclick="generate()">Regenerate</button>
+
+  <div class="divider"></div>
+
+  <div class="seg">
+    <button id="btn-fill" class="on" onclick="setMode('fill')">Fill</button>
+    <button id="btn-outline" onclick="setMode('outline')">Outline</button>
+  </div>
+
+  <!-- Fill options -->
+  <div class="opt-group" id="fillOpts">
+    <div class="opt-item">
+      Color
+      <input type="color" id="fillColor" value="#87B3FF" oninput="render()">
+    </div>
+    <div class="opt-item">
+      Opacity
+      <input type="range" id="fillOpacity" min="1" max="100" value="17" oninput="syncLabel('fillOpacity','fillOpVal');render()">
+      <span class="val" id="fillOpVal">17%</span>
+    </div>
+  </div>
+
+  <!-- Outline options -->
+  <div class="opt-group" id="outlineOpts" style="display:none">
+    <div class="opt-item">
+      Color
+      <input type="color" id="strokeColor" value="#87B3FF" oninput="render()">
+    </div>
+    <div class="opt-item">
+      Opacity
+      <input type="range" id="strokeOpacity" min="1" max="100" value="60" oninput="syncLabel('strokeOpacity','strokeOpVal');render()">
+      <span class="val" id="strokeOpVal">60%</span>
+    </div>
+    <div class="opt-item">
+      Width
+      <input type="range" id="strokeWidth" min="0.5" max="6" step="0.5" value="1.5" oninput="syncLabel('strokeWidth','strokeWVal',false);render()">
+      <span class="val" id="strokeWVal">1.5px</span>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <button class="ghost" onclick="savePNG()">Save PNG</button>
+  <button class="ghost" onclick="savePNG2x()">Save @2x</button>
+</div>
+
+<script>
+// ── Canvas ────────────────────────────────────────────────────────
+const W = 1920, H = 1080;
+const canvas = document.getElementById('c');
+canvas.width = W; canvas.height = H;
+canvas.style.maxWidth = '100%';
+const ctx = canvas.getContext('2d');
+
+// ── Config ────────────────────────────────────────────────────────
+const BH     = 62;
+const MIN_BW = BH * 1.8;
+const MAX_BW = BH * 6.8;
+const H_GAP  = 11;
+const BG     = '#ffffff';
+const TAIL_H = BH * 0.165;
+const ROW_H  = BH + TAIL_H + 22;
+
+// ── App state ─────────────────────────────────────────────────────
+let mode       = 'fill';
+let activeSeed = Date.now();
+
+// ── LCG seeded random ─────────────────────────────────────────────
+let seed = 1;
+function rnd() {
+  seed = (Math.imul(seed, 1664525) + 1013904223) | 0;
+  return (seed >>> 0) / 0xFFFFFFFF;
+}
+function rndRange(lo, hi) { return lo + rnd() * (hi - lo); }
+function rndInt(n)         { return Math.floor(rnd() * n); }
+
+// ── Bubble path constants ─────────────────────────────────────────
+// Derived from tailwithbubble.svg (W=1316 H=315 r=157.5).
+// All values normalized by H, relative to the right arc center.
+const K = 0.5523;
+
+const ARC_R_Q2 = {
+  cp1: { x: 0.5000, y: 0.1688 },
+  cp2: { x: 0.4162, y: 0.3185 },
+  end: { x: 0.2877, y: 0.4089 },
+};
+const TC1 = { cp1:{x:0.2675,y:0.4259}, cp2:{x:0.2206,y:0.4706}, end:{x:0.2206,y:0.5190} };
+const TC2 = { cp1:{x:0.2206,y:0.5808}, cp2:{x:0.2937,y:0.6532}, end:{x:0.2937,y:0.6651} };
+const TC3 = { cp1:{x:0.2937,y:0.7059}, cp2:{x:0.0520,y:0.6179}, end:{x:-0.0364,y:0.5000} };
+
+// ── Path builder ──────────────────────────────────────────────────
+function buildPath(tctx, bx, by, bw, bh) {
+  const r = bh / 2, S = bh;
+  const lcx = bx + r,       lcy = by + r;
+  const acx = bx + bw - r,  acy = by + r;
+  const a = p => [acx + p.x * S, acy + p.y * S];
+
+  tctx.beginPath();
+  tctx.moveTo(...a(TC3.end));
+  tctx.lineTo(lcx, lcy + r);
+
+  // Left semicircle
+  tctx.bezierCurveTo(lcx-K*r, lcy+r,   lcx-r, lcy+K*r,  lcx-r, lcy  );
+  tctx.bezierCurveTo(lcx-r,   lcy-K*r, lcx-K*r, lcy-r,  lcx,   lcy-r);
+
+  tctx.lineTo(acx, by);
+
+  // Right arc Q1: top → rightmost
+  tctx.bezierCurveTo(acx+K*r, acy-r,  acx+r, acy-K*r,  acx+r, acy);
+
+  // Right arc Q2 (partial): rightmost → tail detach
+  tctx.bezierCurveTo(
+    acx + ARC_R_Q2.cp1.x*S, acy + ARC_R_Q2.cp1.y*S,
+    acx + ARC_R_Q2.cp2.x*S, acy + ARC_R_Q2.cp2.y*S,
+    acx + ARC_R_Q2.end.x*S, acy + ARC_R_Q2.end.y*S
+  );
+
+  // Tail
+  tctx.bezierCurveTo(...a(TC1.cp1), ...a(TC1.cp2), ...a(TC1.end));
+  tctx.bezierCurveTo(...a(TC2.cp1), ...a(TC2.cp2), ...a(TC2.end));
+  tctx.bezierCurveTo(...a(TC3.cp1), ...a(TC3.cp2), ...a(TC3.end));
+  tctx.closePath();
+}
+
+// ── Color helpers ─────────────────────────────────────────────────
+function hexToRgb(hex) {
+  return [
+    parseInt(hex.slice(1, 3), 16),
+    parseInt(hex.slice(3, 5), 16),
+    parseInt(hex.slice(5, 7), 16),
+  ];
+}
+
+function pickFillColor() {
+  const [r, g, b] = hexToRgb(document.getElementById('fillColor').value);
+  const baseA = parseFloat(document.getElementById('fillOpacity').value) / 100;
+  // slight per-bubble variation so bubbles don't all look identical
+  const v = c => Math.min(255, Math.max(0, c + Math.round(rndRange(-14, 14))));
+  const a = Math.min(1, Math.max(0.01, baseA * rndRange(0.75, 1.25)));
+  return `rgba(${v(r)},${v(g)},${v(b)},${a.toFixed(3)})`;
+}
+
+function getOutlineStyle() {
+  const [r, g, b] = hexToRgb(document.getElementById('strokeColor').value);
+  const a = parseFloat(document.getElementById('strokeOpacity').value) / 100;
+  return `rgba(${r},${g},${b},${a.toFixed(3)})`;
+}
+
+// ── Draw one bubble ───────────────────────────────────────────────
+function drawBubble(tctx, bx, by, bw, bh, color, tailLeft) {
+  tctx.save();
+  if (tailLeft) {
+    tctx.translate(bx + bw, 0);
+    tctx.scale(-1, 1);
+    bx = 0;
+  }
+  buildPath(tctx, bx, by, bw, bh);
+
+  if (mode === 'outline') {
+    tctx.strokeStyle = getOutlineStyle();
+    tctx.lineWidth   = parseFloat(document.getElementById('strokeWidth').value);
+    tctx.stroke();
+  } else {
+    tctx.fillStyle = color;
+    tctx.fill();
+  }
+  tctx.restore();
+}
+
+// ── Core renderer ─────────────────────────────────────────────────
+function renderRows(tctx, cw, ch) {
+  tctx.save();
+  tctx.fillStyle = BG;
+  tctx.fillRect(0, 0, cw, ch);
+  tctx.scale(cw / W, ch / H);
+
+  const numRows = Math.ceil(H / ROW_H) + 2;
+  for (let row = 0; row < numRows; row++) {
+    const tailLeft = row % 2 === 1;
+    const by = row * ROW_H + rndRange(-4, 4);
+    let   x  = -rndRange(0, MAX_BW * 0.6);
+
+    while (x < W + BH) {
+      const bw    = rndRange(MIN_BW, MAX_BW);
+      const color = pickFillColor();
+      drawBubble(tctx, x, by, bw, BH, color, tailLeft);
+      x += bw + H_GAP;
+    }
+  }
+  tctx.restore();
+}
+
+function render() {
+  seed = activeSeed;
+  renderRows(ctx, W, H);
+}
+
+function generate() {
+  activeSeed = Date.now() ^ (Math.random() * 0x100000000);
+  render();
+}
+
+generate();
+
+// ── Mode toggle ───────────────────────────────────────────────────
+function setMode(m) {
+  mode = m;
+  document.getElementById('btn-fill').classList.toggle('on', m === 'fill');
+  document.getElementById('btn-outline').classList.toggle('on', m === 'outline');
+  document.getElementById('fillOpts').style.display    = m === 'fill'    ? 'flex' : 'none';
+  document.getElementById('outlineOpts').style.display = m === 'outline' ? 'flex' : 'none';
+  render();
+}
+
+// ── Label sync ────────────────────────────────────────────────────
+function syncLabel(inputId, labelId, isPercent = true) {
+  const val = document.getElementById(inputId).value;
+  document.getElementById(labelId).textContent = isPercent ? val + '%' : val + 'px';
+}
+
+// ── Export ────────────────────────────────────────────────────────
+function savePNG() {
+  const a = document.createElement('a');
+  a.download = 'bubble-bg.png';
+  a.href = canvas.toDataURL('image/png');
+  a.click();
+}
+
+function savePNG2x() {
+  const c2 = document.createElement('canvas');
+  c2.width = W * 2; c2.height = H * 2;
+  seed = activeSeed;
+  renderRows(c2.getContext('2d'), W * 2, H * 2);
+  const a = document.createElement('a');
+  a.download = 'bubble-bg@2x.png';
+  a.href = c2.toDataURL('image/png');
+  a.click();
+}
+</script>
+</body>
+</html>
