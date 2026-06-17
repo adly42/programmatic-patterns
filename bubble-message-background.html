@@ -36,10 +36,15 @@
     font-size: 13px;
     font-weight: 500;
     cursor: pointer;
+    transition: background 0.1s;
   }
   button:hover { background: #0066dd; }
   button.ghost { background: #2c2c2e; color: #ccc; }
   button.ghost:hover { background: #3a3a3c; }
+  button.on { background: #30d158; color: #000; }
+  button.on:hover { background: #28b84c; }
+  button.rec { background: #ff3b30; color: #fff; }
+  button.rec:hover { background: #d93226; }
 
   .seg {
     display: flex;
@@ -58,11 +63,7 @@
   }
   .seg button.on { background: #48484a; color: #fff; }
 
-  .opt-group {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
+  .opt-group { display: flex; align-items: center; gap: 12px; }
   .opt-item {
     display: flex;
     align-items: center;
@@ -70,12 +71,7 @@
     color: #777;
     font-size: 12px;
   }
-  .opt-item span.val {
-    color: #aaa;
-    font-size: 12px;
-    min-width: 28px;
-    text-align: right;
-  }
+  .opt-item span.val { color: #aaa; font-size: 12px; min-width: 32px; text-align: right; }
   input[type="color"] {
     -webkit-appearance: none;
     width: 28px; height: 28px;
@@ -84,11 +80,7 @@
   }
   input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
   input[type="color"]::-webkit-color-swatch { border-radius: 5px; border: 2px solid #444; }
-  input[type="range"] {
-    width: 80px;
-    accent-color: #007AFF;
-    cursor: pointer;
-  }
+  input[type="range"] { width: 80px; accent-color: #007AFF; cursor: pointer; }
   .divider { width: 1px; height: 26px; background: #2e2e2e; }
 </style>
 </head>
@@ -97,6 +89,14 @@
 
 <div class="controls">
   <button onclick="generate()">Regenerate</button>
+  <button id="btn-anim" class="ghost" onclick="toggleAnim()">Animate</button>
+
+  <div class="opt-item" id="speedOpt" style="display:none">
+    Speed
+    <input type="range" id="animSpeed" min="10" max="300" value="60"
+           oninput="document.getElementById('speedVal').textContent=this.value+'px/s'">
+    <span class="val" id="speedVal">60px/s</span>
+  </div>
 
   <div class="divider"></div>
 
@@ -109,11 +109,12 @@
   <div class="opt-group" id="fillOpts">
     <div class="opt-item">
       Color
-      <input type="color" id="fillColor" value="#87B3FF" oninput="render()">
+      <input type="color" id="fillColor" value="#87B3FF" oninput="recolor()">
     </div>
     <div class="opt-item">
       Opacity
-      <input type="range" id="fillOpacity" min="1" max="100" value="17" oninput="syncLabel('fillOpacity','fillOpVal');render()">
+      <input type="range" id="fillOpacity" min="1" max="100" value="17"
+             oninput="syncLabel('fillOpacity','fillOpVal');recolor()">
       <span class="val" id="fillOpVal">17%</span>
     </div>
   </div>
@@ -122,16 +123,18 @@
   <div class="opt-group" id="outlineOpts" style="display:none">
     <div class="opt-item">
       Color
-      <input type="color" id="strokeColor" value="#87B3FF" oninput="render()">
+      <input type="color" id="strokeColor" value="#87B3FF" oninput="staticRender()">
     </div>
     <div class="opt-item">
       Opacity
-      <input type="range" id="strokeOpacity" min="1" max="100" value="60" oninput="syncLabel('strokeOpacity','strokeOpVal');render()">
+      <input type="range" id="strokeOpacity" min="1" max="100" value="60"
+             oninput="syncLabel('strokeOpacity','strokeOpVal');staticRender()">
       <span class="val" id="strokeOpVal">60%</span>
     </div>
     <div class="opt-item">
       Width
-      <input type="range" id="strokeWidth" min="0.5" max="6" step="0.5" value="1.5" oninput="syncLabel('strokeWidth','strokeWVal',false);render()">
+      <input type="range" id="strokeWidth" min="0.5" max="6" step="0.5" value="1.5"
+             oninput="syncLabel('strokeWidth','strokeWVal',false);staticRender()">
       <span class="val" id="strokeWVal">1.5px</span>
     </div>
   </div>
@@ -140,6 +143,12 @@
 
   <button class="ghost" onclick="savePNG()">Save PNG</button>
   <button class="ghost" onclick="savePNG2x()">Save @2x</button>
+  <button id="btn-rec" class="ghost" onclick="toggleRecord()">Save Video</button>
+  <div class="opt-item" id="recOpts">
+    <input type="range" id="recDuration" min="3" max="30" step="1" value="5"
+           oninput="document.getElementById('recDurVal').textContent=this.value+'s'">
+    <span class="val" id="recDurVal">5s</span>
+  </div>
 </div>
 
 <script>
@@ -162,6 +171,13 @@ const ROW_H  = BH + TAIL_H + 22;
 // ── App state ─────────────────────────────────────────────────────
 let mode       = 'fill';
 let activeSeed = Date.now();
+let rowData    = []; // [{tailLeft, by, bubbles:[{x,bw,color}], tileWidth, rowPhase}]
+
+// ── Animation state ───────────────────────────────────────────────
+let animating     = false;
+let animOffset    = 0;   // px, grows monotonically
+let lastFrameTime = null;
+let rafId         = null;
 
 // ── LCG seeded random ─────────────────────────────────────────────
 let seed = 1;
@@ -174,13 +190,10 @@ function rndInt(n)         { return Math.floor(rnd() * n); }
 
 // ── Bubble path constants ─────────────────────────────────────────
 // Derived from tailwithbubble.svg (W=1316 H=315 r=157.5).
-// All values normalized by H, relative to the right arc center.
+// All normalized by H, relative to right arc center.
 const K = 0.5523;
-
 const ARC_R_Q2 = {
-  cp1: { x: 0.5000, y: 0.1688 },
-  cp2: { x: 0.4162, y: 0.3185 },
-  end: { x: 0.2877, y: 0.4089 },
+  cp1: { x: 0.5000, y: 0.1688 }, cp2: { x: 0.4162, y: 0.3185 }, end: { x: 0.2877, y: 0.4089 },
 };
 const TC1 = { cp1:{x:0.2675,y:0.4259}, cp2:{x:0.2206,y:0.4706}, end:{x:0.2206,y:0.5190} };
 const TC2 = { cp1:{x:0.2206,y:0.5808}, cp2:{x:0.2937,y:0.6532}, end:{x:0.2937,y:0.6651} };
@@ -196,66 +209,30 @@ function buildPath(tctx, bx, by, bw, bh) {
   tctx.beginPath();
   tctx.moveTo(...a(TC3.end));
   tctx.lineTo(lcx, lcy + r);
-
-  // Left semicircle
-  tctx.bezierCurveTo(lcx-K*r, lcy+r,   lcx-r, lcy+K*r,  lcx-r, lcy  );
+  tctx.bezierCurveTo(lcx-K*r, lcy+r,   lcx-r, lcy+K*r,  lcx-r, lcy);
   tctx.bezierCurveTo(lcx-r,   lcy-K*r, lcx-K*r, lcy-r,  lcx,   lcy-r);
-
   tctx.lineTo(acx, by);
-
-  // Right arc Q1: top → rightmost
-  tctx.bezierCurveTo(acx+K*r, acy-r,  acx+r, acy-K*r,  acx+r, acy);
-
-  // Right arc Q2 (partial): rightmost → tail detach
+  tctx.bezierCurveTo(acx+K*r, acy-r,   acx+r, acy-K*r,  acx+r, acy);
   tctx.bezierCurveTo(
     acx + ARC_R_Q2.cp1.x*S, acy + ARC_R_Q2.cp1.y*S,
     acx + ARC_R_Q2.cp2.x*S, acy + ARC_R_Q2.cp2.y*S,
     acx + ARC_R_Q2.end.x*S, acy + ARC_R_Q2.end.y*S
   );
-
-  // Tail
   tctx.bezierCurveTo(...a(TC1.cp1), ...a(TC1.cp2), ...a(TC1.end));
   tctx.bezierCurveTo(...a(TC2.cp1), ...a(TC2.cp2), ...a(TC2.end));
   tctx.bezierCurveTo(...a(TC3.cp1), ...a(TC3.cp2), ...a(TC3.end));
   tctx.closePath();
 }
 
-// ── Color helpers ─────────────────────────────────────────────────
-function hexToRgb(hex) {
-  return [
-    parseInt(hex.slice(1, 3), 16),
-    parseInt(hex.slice(3, 5), 16),
-    parseInt(hex.slice(5, 7), 16),
-  ];
-}
-
-function pickFillColor() {
-  const [r, g, b] = hexToRgb(document.getElementById('fillColor').value);
-  const baseA = parseFloat(document.getElementById('fillOpacity').value) / 100;
-  // slight per-bubble variation so bubbles don't all look identical
-  const v = c => Math.min(255, Math.max(0, c + Math.round(rndRange(-14, 14))));
-  const a = Math.min(1, Math.max(0.01, baseA * rndRange(0.75, 1.25)));
-  return `rgba(${v(r)},${v(g)},${v(b)},${a.toFixed(3)})`;
-}
-
-function getOutlineStyle() {
-  const [r, g, b] = hexToRgb(document.getElementById('strokeColor').value);
-  const a = parseFloat(document.getElementById('strokeOpacity').value) / 100;
-  return `rgba(${r},${g},${b},${a.toFixed(3)})`;
-}
-
 // ── Draw one bubble ───────────────────────────────────────────────
 function drawBubble(tctx, bx, by, bw, bh, color, tailLeft) {
   tctx.save();
-  if (tailLeft) {
-    tctx.translate(bx + bw, 0);
-    tctx.scale(-1, 1);
-    bx = 0;
-  }
+  if (tailLeft) { tctx.translate(bx + bw, 0); tctx.scale(-1, 1); bx = 0; }
   buildPath(tctx, bx, by, bw, bh);
-
   if (mode === 'outline') {
-    tctx.strokeStyle = getOutlineStyle();
+    const [r,g,b] = hexToRgb(document.getElementById('strokeColor').value);
+    const a = parseFloat(document.getElementById('strokeOpacity').value) / 100;
+    tctx.strokeStyle = `rgba(${r},${g},${b},${a.toFixed(3)})`;
     tctx.lineWidth   = parseFloat(document.getElementById('strokeWidth').value);
     tctx.stroke();
   } else {
@@ -265,40 +242,130 @@ function drawBubble(tctx, bx, by, bw, bh, color, tailLeft) {
   tctx.restore();
 }
 
-// ── Core renderer ─────────────────────────────────────────────────
-function renderRows(tctx, cw, ch) {
-  tctx.save();
-  tctx.fillStyle = BG;
-  tctx.fillRect(0, 0, cw, ch);
-  tctx.scale(cw / W, ch / H);
+// ── Color helpers ─────────────────────────────────────────────────
+function hexToRgb(hex) {
+  return [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16)];
+}
+function pickFillColor() {
+  const [r,g,b] = hexToRgb(document.getElementById('fillColor').value);
+  const baseA = parseFloat(document.getElementById('fillOpacity').value) / 100;
+  const v = (c, d) => Math.min(255, Math.max(0, c + Math.round(rndRange(-d, d))));
+  const a = Math.min(1, Math.max(0.01, baseA * rndRange(0.75, 1.25)));
+  return `rgba(${v(r,14)},${v(g,14)},${v(b,14)},${a.toFixed(3)})`;
+}
 
+// ── Layout pre-computation ────────────────────────────────────────
+// Run once per new seed or color change.
+// Bubbles start at x=0 and extend to tileWidth — the seamless loop period.
+// rowPhase offsets each row randomly so they don't all start at the same place.
+function computeLayout() {
+  seed = activeSeed;
+  rowData = [];
   const numRows = Math.ceil(H / ROW_H) + 2;
+
   for (let row = 0; row < numRows; row++) {
     const tailLeft = row % 2 === 1;
     const by = row * ROW_H + rndRange(-4, 4);
-    let   x  = -rndRange(0, MAX_BW * 0.6);
+    const bubbles = [];
+    let x = 0;
 
-    while (x < W + BH) {
+    // Generate bubbles until we have enough to tile the canvas with room to spare.
+    // tileWidth = accumulated x after all bubbles = the seamless loop period.
+    while (x < W * 1.5 + MAX_BW) {
       const bw    = rndRange(MIN_BW, MAX_BW);
       const color = pickFillColor();
-      drawBubble(tctx, x, by, bw, BH, color, tailLeft);
+      bubbles.push({ x, bw, color });
       x += bw + H_GAP;
     }
+
+    const tileWidth = x; // next bubble would start here — this is the loop period
+    const rowPhase  = Math.floor(rndRange(0, tileWidth)); // seeded per-row visual stagger
+
+    rowData.push({ tailLeft, by, bubbles, tileWidth, rowPhase });
   }
+}
+
+// ── Draw one row with tile offset ─────────────────────────────────
+// offset: global animation offset in px (monotonically increasing)
+// dir: +1 = row drifts right, -1 = drifts left
+function drawRow(tctx, row, offset) {
+  const { tailLeft, by, bubbles, tileWidth, rowPhase } = row;
+  const dir      = tailLeft ? 1 : -1;  // left-tail rows move right, right-tail move left
+  const totalOff = rowPhase + dir * offset;
+  // Normalise into [0, tileWidth) so offset wraps cleanly
+  const normOff  = ((totalOff % tileWidth) + tileWidth) % tileWidth;
+
+  for (const b of bubbles) {
+    // Try three tile copies — handles bubbles near the loop boundary
+    for (const shift of [0, -tileWidth, tileWidth]) {
+      const bx = b.x + normOff + shift;
+      if (bx > W + BH || bx + b.bw < -BH) continue;
+      drawBubble(tctx, bx, by, b.bw, BH, b.color, tailLeft);
+    }
+  }
+}
+
+// ── Render frame ──────────────────────────────────────────────────
+function renderFrame(tctx, cw, ch, offset) {
+  const sx = cw / W, sy = ch / H;
+  tctx.save();
+  tctx.fillStyle = BG;
+  tctx.fillRect(0, 0, cw, ch);
+  tctx.scale(sx, sy);
+  for (const row of rowData) drawRow(tctx, row, offset);
   tctx.restore();
 }
 
-function render() {
-  seed = activeSeed;
-  renderRows(ctx, W, H);
+// ── Static render (no animation, uses current animOffset) ─────────
+function staticRender() {
+  if (!animating) renderFrame(ctx, W, H, animOffset);
 }
 
+// ── Recolor: recompute layout with same seed (updates colors) ──────
+function recolor() {
+  computeLayout();
+  staticRender();
+}
+
+// ── Generate: new seed → full recompute ───────────────────────────
 function generate() {
   activeSeed = Date.now() ^ (Math.random() * 0x100000000);
-  render();
+  animOffset = 0;
+  computeLayout();
+  if (!animating) renderFrame(ctx, W, H, 0);
 }
 
-generate();
+// ── Animation RAF loop ────────────────────────────────────────────
+function animFrame(ts) {
+  if (!lastFrameTime) lastFrameTime = ts;
+  const dt = (ts - lastFrameTime) / 1000; // seconds
+  lastFrameTime = ts;
+
+  const speed = parseFloat(document.getElementById('animSpeed').value);
+  animOffset += speed * dt;
+
+  renderFrame(ctx, W, H, animOffset);
+  if (animating) rafId = requestAnimationFrame(animFrame);
+}
+
+function toggleAnim() {
+  if (animating) {
+    animating = false;
+    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+    lastFrameTime = null;
+    document.getElementById('btn-anim').className = 'ghost';
+    document.getElementById('btn-anim').textContent = 'Animate';
+    document.getElementById('speedOpt').style.display = 'none';
+    renderFrame(ctx, W, H, animOffset); // freeze at current frame
+  } else {
+    animating = true;
+    lastFrameTime = null;
+    document.getElementById('btn-anim').className = 'on';
+    document.getElementById('btn-anim').textContent = 'Stop';
+    document.getElementById('speedOpt').style.display = 'flex';
+    rafId = requestAnimationFrame(animFrame);
+  }
+}
 
 // ── Mode toggle ───────────────────────────────────────────────────
 function setMode(m) {
@@ -307,10 +374,10 @@ function setMode(m) {
   document.getElementById('btn-outline').classList.toggle('on', m === 'outline');
   document.getElementById('fillOpts').style.display    = m === 'fill'    ? 'flex' : 'none';
   document.getElementById('outlineOpts').style.display = m === 'outline' ? 'flex' : 'none';
-  render();
+  staticRender();
 }
 
-// ── Label sync ────────────────────────────────────────────────────
+// ── Slider label sync ─────────────────────────────────────────────
 function syncLabel(inputId, labelId, isPercent = true) {
   const val = document.getElementById(inputId).value;
   document.getElementById(labelId).textContent = isPercent ? val + '%' : val + 'px';
@@ -323,17 +390,93 @@ function savePNG() {
   a.href = canvas.toDataURL('image/png');
   a.click();
 }
-
 function savePNG2x() {
   const c2 = document.createElement('canvas');
   c2.width = W * 2; c2.height = H * 2;
-  seed = activeSeed;
-  renderRows(c2.getContext('2d'), W * 2, H * 2);
+  renderFrame(c2.getContext('2d'), W * 2, H * 2, animOffset);
   const a = document.createElement('a');
   a.download = 'bubble-bg@2x.png';
   a.href = c2.toDataURL('image/png');
   a.click();
 }
+
+// ── Video recording ───────────────────────────────────────────────
+let recording      = false;
+let mediaRecorder  = null;
+let recTimer       = null;
+
+function toggleRecord() {
+  if (recording) {
+    // Manual stop
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+    return;
+  }
+
+  const duration = parseFloat(document.getElementById('recDuration').value) * 1000;
+
+  // Pick best supported format
+  const mimeType = [
+    'video/webm;codecs=vp9',
+    'video/webm;codecs=vp8',
+    'video/webm',
+  ].find(t => MediaRecorder.isTypeSupported(t));
+
+  if (!mimeType) {
+    alert('MediaRecorder is not supported in this browser.');
+    return;
+  }
+
+  // Auto-start animation if it isn't running
+  const autoStarted = !animating;
+  if (autoStarted) toggleAnim();
+
+  const stream   = canvas.captureStream(60);
+  mediaRecorder  = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000 });
+  const chunks   = [];
+
+  mediaRecorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+
+  mediaRecorder.onstop = () => {
+    recording = false;
+    clearInterval(recTimer);
+    document.getElementById('btn-rec').className  = 'ghost';
+    document.getElementById('btn-rec').textContent = 'Save Video';
+    document.getElementById('recDuration').disabled = false;
+
+    const blob = new Blob(chunks, { type: 'video/webm' });
+    const a    = document.createElement('a');
+    a.download = 'bubble-bg.webm';
+    a.href     = URL.createObjectURL(blob);
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+
+    if (autoStarted) toggleAnim(); // restore prior state
+  };
+
+  recording = true;
+  mediaRecorder.start(100); // collect in 100ms chunks
+  document.getElementById('recDuration').disabled = true;
+
+  // Countdown label
+  let remaining = duration / 1000;
+  const update  = () => {
+    document.getElementById('btn-rec').className  = 'rec';
+    document.getElementById('btn-rec').textContent = `Stop (${remaining.toFixed(1)}s)`;
+  };
+  update();
+  recTimer = setInterval(() => {
+    remaining -= 0.1;
+    if (remaining <= 0) {
+      clearInterval(recTimer);
+      if (mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+    } else {
+      update();
+    }
+  }, 100);
+}
+
+// ── Init ──────────────────────────────────────────────────────────
+generate();
 </script>
 </body>
 </html>
