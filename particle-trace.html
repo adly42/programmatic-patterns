@@ -295,7 +295,12 @@ function loadImgData(img) {
   const oc = document.createElement('canvas');
   oc.width = FW; oc.height = FH;
   const ox = oc.getContext('2d');
-  ox.drawImage(img, 0, 0, FW, FH);
+  // Contain: preserve aspect ratio, center, letterbox with black
+  const scale = Math.min(FW / img.width, FH / img.height);
+  const sw = img.width * scale, sh = img.height * scale;
+  ox.fillStyle = '#000';
+  ox.fillRect(0, 0, FW, FH);
+  ox.drawImage(img, (FW - sw) / 2, (FH - sh) / 2, sw, sh);
   const d = ox.getImageData(0, 0, FW, FH).data;
   for (let i = 0; i < FW * FH; i++) {
     const lum = (d[i*4]*0.299 + d[i*4+1]*0.587 + d[i*4+2]*0.114) / 255;
