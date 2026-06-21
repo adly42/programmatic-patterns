@@ -89,6 +89,7 @@
     <button data-color="gold">gold</button>
     <button data-color="blue">blue</button>
   </div>
+  <label>opacity <input type="range" id="opacity" min="0" max="1" step="0.01" value="1"></label>
   <label>speed <input type="range" id="speed" min="0.1" max="3" step="0.05" value="1"></label>
   <button class="ghost" id="pauseBtn">pause</button>
 </div>
@@ -111,6 +112,7 @@ precision highp float;
 uniform vec2  u_res;
 uniform float u_time;
 uniform vec3  u_tint;
+uniform float u_opacity;
 out vec4 fragColor;
 
 void main() {
@@ -120,7 +122,7 @@ void main() {
     p *= mat2(6.0, -8.0, 8.0, 6.0) / 9.0;
   }
   float L = tanh(length(fwidth(sin(p * 0.3) / 0.1)));
-  fragColor = vec4(u_tint * L, 1.0);
+  fragColor = vec4(u_tint * L, u_opacity);
 }`;
 
 function compile(type, src) {
@@ -146,9 +148,10 @@ const loc = gl.getAttribLocation(prog, 'a_pos');
 gl.enableVertexAttribArray(loc);
 gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
 
-const uRes  = gl.getUniformLocation(prog, 'u_res');
-const uTime = gl.getUniformLocation(prog, 'u_time');
-const uTint = gl.getUniformLocation(prog, 'u_tint');
+const uRes     = gl.getUniformLocation(prog, 'u_res');
+const uTime    = gl.getUniformLocation(prog, 'u_time');
+const uTint    = gl.getUniformLocation(prog, 'u_tint');
+const uOpacity = gl.getUniformLocation(prog, 'u_opacity');
 
 // ── state ─────────────────────────────────────────────────────────────────────
 
@@ -160,6 +163,7 @@ const TINTS = {
 };
 
 let tint    = TINTS.white;
+let opacity = 1.0;
 let speed   = 1.0;
 let paused  = false;
 let elapsed = 0.0;
@@ -173,6 +177,10 @@ document.getElementById('colorSeg').addEventListener('click', e => {
   document.querySelectorAll('#colorSeg button').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   tint = TINTS[btn.dataset.color];
+});
+
+document.getElementById('opacity').addEventListener('input', e => {
+  opacity = parseFloat(e.target.value);
 });
 
 document.getElementById('speed').addEventListener('input', e => {
@@ -197,8 +205,9 @@ function frame(ts) {
 
   gl.viewport(0, 0, canvas.width, canvas.height);
   gl.uniform2f(uRes,  canvas.width, canvas.height);
-  gl.uniform1f(uTime, elapsed);
-  gl.uniform3fv(uTint, tint);
+  gl.uniform1f(uTime,    elapsed);
+  gl.uniform3fv(uTint,   tint);
+  gl.uniform1f(uOpacity, opacity);
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
   requestAnimationFrame(frame);
