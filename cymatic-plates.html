@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cymatic Plates</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #111;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  padding: 16px;
+  gap: 14px;
+  overflow: hidden;
+}
+
+canvas {
+  display: block;
+  width: min(calc(100vh - 200px), calc(100vw - 32px));
+  height: min(calc(100vh - 200px), calc(100vw - 32px));
+  image-rendering: pixelated;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.panel {
+  background: rgba(255,255,255,0.055);
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 14px;
+  padding: 13px 16px;
+  width: min(calc(100vw - 32px), 640px);
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lbl {
+  font-size: 11px;
+  color: rgba(255,255,255,0.35);
+  width: 72px;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+input[type=range] {
+  flex: 1;
+  accent-color: rgba(255,255,255,0.55);
+  cursor: pointer;
+  height: 3px;
+}
+
+.val {
+  font-size: 11px;
+  color: rgba(255,255,255,0.45);
+  font-variant-numeric: tabular-nums;
+  min-width: 30px;
+  text-align: right;
+}
+
+.seg {
+  display: flex;
+  gap: 1px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 8px;
+  padding: 3px;
+}
+
+.seg button {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.35);
+  padding: 4px 9px;
+  border-radius: 6px;
+  font-size: 11px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.12s;
+  white-space: nowrap;
+}
+
+.seg button.active {
+  background: rgba(255,255,255,0.13);
+  color: rgba(255,255,255,0.85);
+}
+
+.seg button:hover:not(.active) {
+  color: rgba(255,255,255,0.6);
+}
+
+.btns {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 1px;
+}
+
+.btns button {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.09);
+  color: rgba(255,255,255,0.65);
+  padding: 5px 13px;
+  border-radius: 7px;
+  font-size: 11px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.12s;
+}
+
+.btns button:hover {
+  background: rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.9);
+}
+
+.btns button.rec {
+  background: #ff3b30;
+  border-color: #ff3b30;
+  color: #fff;
+}
+
+.top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.title {
+  font-size: 11px;
+  color: rgba(255,255,255,0.28);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hr {
+  height: 1px;
+  background: rgba(255,255,255,0.07);
+  margin: 1px 0;
+}
+</style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+
+<div class="panel">
+  <div class="top-row">
+    <span class="title">Cymatic Plates</span>
+    <div class="seg" id="seg-fold">
+      <button data-n="2">2×</button>
+      <button data-n="3">3×</button>
+      <button data-n="4">4×</button>
+      <button data-n="5">5×</button>
+      <button data-n="6" class="active">6×</button>
+      <button data-n="8">8×</button>
+      <button data-n="12">12×</button>
+    </div>
+  </div>
+
+  <div class="hr"></div>
+
+  <div class="row">
+    <span class="lbl">Frequency</span>
+    <input type="range" id="sFreq" min="2" max="40" value="9" step="0.25">
+    <span class="val" id="vFreq">9</span>
+  </div>
+  <div class="row">
+    <span class="lbl">Fold Mix</span>
+    <input type="range" id="sFold" min="0" max="1" value="0.65" step="0.01">
+    <span class="val" id="vFold">0.65</span>
+  </div>
+  <div class="row">
+    <span class="lbl">Ring Mix</span>
+    <input type="range" id="sRing" min="0" max="1" value="0.35" step="0.01">
+    <span class="val" id="vRing">0.35</span>
+  </div>
+  <div class="row">
+    <span class="lbl">Speed</span>
+    <input type="range" id="sSpeed" min="0" max="2" value="0.4" step="0.02">
+    <span class="val" id="vSpeed">0.40</span>
+  </div>
+
+  <div class="hr"></div>
+
+  <div class="btns">
+    <button id="btnPlay" onclick="togglePlay()">⏸ Pause</button>
+    <button onclick="savePng(1)">↓ PNG</button>
+    <button onclick="savePng(2)">↓ PNG @2x</button>
+    <button id="btnRec" onclick="toggleRecord()">⏺ Record</button>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const SIZE = 512;
+canvas.width = SIZE;
+canvas.height = SIZE;
+
+// Bayer 8x8 ordered dither matrix (0–63)
+const BAYER8 = new Uint8Array([
+   0, 32,  8, 40,  2, 34, 10, 42,
+  48, 16, 56, 24, 50, 18, 58, 26,
+  12, 44,  4, 36, 14, 46,  6, 38,
+  60, 28, 52, 20, 62, 30, 54, 22,
+   3, 35, 11, 43,  1, 33,  9, 41,
+  51, 19, 59, 27, 49, 17, 57, 25,
+  15, 47,  7, 39, 13, 45,  5, 37,
+  63, 31, 55, 23, 61, 29, 53, 21
+]);
+
+let foldN = 6;
+let playing = true;
+let t = 0;
+let lastTs = null;
+let rafId;
+
+// pre-computed direction vectors, rebuilt when foldN changes
+let cas = [], sas = [], phaseVels = [];
+
+function updateDirs() {
+  cas = []; sas = []; phaseVels = [];
+  for (let k = 0; k < foldN; k++) {
+    const a = (Math.PI * k) / foldN;
+    cas.push(Math.cos(a));
+    sas.push(Math.sin(a));
+    // slightly different velocities per wave: creates organic morphing
+    phaseVels.push(k % 2 === 0 ? 1.0 : -0.73);
+  }
+}
+updateDirs();
+
+function getParams() {
+  return {
+    freq:    parseFloat(document.getElementById('sFreq').value),
+    foldMix: parseFloat(document.getElementById('sFold').value),
+    ringMix: parseFloat(document.getElementById('sRing').value),
+    speed:   parseFloat(document.getElementById('sSpeed').value),
+  };
+}
+
+function renderAt(t_val, params, targetCtx, sz) {
+  const { freq, foldMix, ringMix } = params;
+  const n = foldN;
+
+  const imgData = targetCtx.createImageData(sz, sz);
+  const buf = imgData.data;
+
+  // build a local bayer table scaled to sz if needed
+  const bayerTable = BAYER8;
+  const bayerMod = 8;
+
+  for (let py = 0; py < sz; py++) {
+    const fy = (py / sz - 0.5) * 2;
+    const fy2 = fy * fy;
+
+    // per-row y-contribution for each wave direction
+    const rowBase = new Float32Array(n);
+    for (let k = 0; k < n; k++) {
+      rowBase[k] = freq * sas[k] * fy + t_val * phaseVels[k];
+    }
+
+    const byRow = (py & 7) * 8; // bayer row offset
+
+    for (let px = 0; px < sz; px++) {
+      const fx = (px / sz - 0.5) * 2;
+      const fxf = freq * fx;
+
+      // n-fold plane wave superposition
+      let z = 0;
+      for (let k = 0; k < n; k++) {
+        z += Math.cos(cas[k] * fxf + rowBase[k]);
+      }
+      z /= n; // ~[-1, 1]
+
+      // Fold mix: blend toward 2|z|-1 (bright wave peaks, dark nodal lines)
+      if (foldMix > 0.001) {
+        const zf = 2.0 * Math.abs(z) - 1.0;
+        z = z + (zf - z) * foldMix;
+      }
+
+      // Ring mix: radial amplitude modulation
+      if (ringMix > 0.001) {
+        const r = Math.sqrt(fx * fx + fy2);
+        const ring = Math.cos(freq * r * 0.6 + t_val * 0.45) * 0.5 + 0.5; // [0,1]
+        z = z * (1.0 - ringMix) + z * ring * ringMix;
+      }
+
+      // Normalize to [0, 1]
+      const v = z * 0.5 + 0.5;
+
+      // Bayer ordered dither
+      const bayer = bayerTable[byRow + (px & 7)] / 64.0;
+      const pv = v > bayer ? 255 : 0;
+
+      const i = (py * sz + px) << 2;
+      buf[i] = buf[i + 1] = buf[i + 2] = pv;
+      buf[i + 3] = 255;
+    }
+  }
+
+  targetCtx.putImageData(imgData, 0, 0);
+}
+
+function frame(ts) {
+  if (lastTs === null) lastTs = ts;
+  const dt = Math.min((ts - lastTs) / 1000, 0.05);
+  lastTs = ts;
+
+  const p = getParams();
+  if (playing) t += dt * p.speed;
+
+  renderAt(t, p, ctx, SIZE);
+  rafId = requestAnimationFrame(frame);
+}
+
+rafId = requestAnimationFrame(frame);
+
+// ---- Controls ----
+
+document.getElementById('seg-fold').addEventListener('click', e => {
+  const btn = e.target.closest('[data-n]');
+  if (!btn) return;
+  foldN = parseInt(btn.dataset.n);
+  updateDirs();
+  document.querySelectorAll('#seg-fold button').forEach(b => {
+    b.classList.toggle('active', b === btn);
+  });
+});
+
+[
+  ['sFreq', 'vFreq', 0],
+  ['sFold', 'vFold', 2],
+  ['sRing', 'vRing', 2],
+  ['sSpeed', 'vSpeed', 2],
+].forEach(([sid, vid, dp]) => {
+  const sl = document.getElementById(sid);
+  const vl = document.getElementById(vid);
+  sl.addEventListener('input', () => {
+    vl.textContent = parseFloat(sl.value).toFixed(dp);
+  });
+});
+
+function togglePlay() {
+  playing = !playing;
+  document.getElementById('btnPlay').textContent = playing ? '⏸ Pause' : '▶ Play';
+  if (playing) lastTs = null;
+}
+
+function savePng(scale) {
+  const sz = SIZE * scale;
+  const c2 = document.createElement('canvas');
+  c2.width = sz;
+  c2.height = sz;
+  const cx2 = c2.getContext('2d');
+
+  if (scale === 1) {
+    cx2.drawImage(canvas, 0, 0);
+  } else {
+    // Re-render at higher res for export
+    renderAt(t, getParams(), cx2, sz);
+  }
+
+  const a = document.createElement('a');
+  a.download = scale === 1 ? 'cymatic-plates.png' : `cymatic-plates@${scale}x.png`;
+  a.href = c2.toDataURL('image/png');
+  a.click();
+}
+
+// ---- Video export ----
+let mediaRecorder = null;
+let recordChunks = [];
+
+function toggleRecord() {
+  const btn = document.getElementById('btnRec');
+  if (!mediaRecorder) {
+    const mimeType = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']
+      .find(m => MediaRecorder.isTypeSupported(m));
+    const stream = canvas.captureStream(30);
+    mediaRecorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000 });
+    recordChunks = [];
+    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordChunks.push(e.data); };
+    mediaRecorder.onstop = () => {
+      const blob = new Blob(recordChunks, { type: mimeType });
+      const a = document.createElement('a');
+      a.download = 'cymatic-plates.webm';
+      a.href = URL.createObjectURL(blob);
+      a.click();
+      URL.revokeObjectURL(a.href);
+      mediaRecorder = null;
+    };
+    mediaRecorder.start();
+    btn.textContent = '⏹ Stop';
+    btn.classList.add('rec');
+    if (!playing) togglePlay();
+  } else {
+    mediaRecorder.stop();
+    btn.textContent = '⏺ Record';
+    btn.classList.remove('rec');
+  }
+}
+</script>
+
+</body>
+</html>

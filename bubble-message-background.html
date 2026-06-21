@@ -103,6 +103,7 @@
   <div class="seg">
     <button id="btn-fill" class="on" onclick="setMode('fill')">Fill</button>
     <button id="btn-outline" onclick="setMode('outline')">Outline</button>
+    <button id="btn-glass" onclick="setMode('glass')">Glass</button>
   </div>
 
   <!-- Fill options -->
@@ -224,21 +225,80 @@ function buildPath(tctx, bx, by, bw, bh) {
   tctx.closePath();
 }
 
+// ── Liquid glass bubble renderer ──────────────────────────────────
+// Layers: tint base → top specular sweep → radial glint → bright edge stroke → bottom darkening
+function drawGlassBubble(tctx, bx, by, bw, bh, color) {
+  const r = bh / 2;
+
+  // 1. Base tint + drop shadow
+  tctx.save();
+  tctx.shadowColor    = 'rgba(0,0,0,0.18)';
+  tctx.shadowBlur     = 14;
+  tctx.shadowOffsetY  = 3;
+  buildPath(tctx, bx, by, bw, bh);
+  tctx.fillStyle = color;
+  tctx.fill();
+  tctx.restore();
+
+  // 2. Specular + glint layers clipped to bubble shape
+  tctx.save();
+  buildPath(tctx, bx, by, bw, bh);
+  tctx.clip();
+
+  // Top specular sweep — strong white at top, fades out by 70% down
+  const spec = tctx.createLinearGradient(0, by, 0, by + bh * 0.72);
+  spec.addColorStop(0,    'rgba(255,255,255,0.58)');
+  spec.addColorStop(0.28, 'rgba(255,255,255,0.22)');
+  spec.addColorStop(0.60, 'rgba(255,255,255,0.05)');
+  spec.addColorStop(1,    'rgba(255,255,255,0)');
+  tctx.fillStyle = spec;
+  tctx.fillRect(bx - r, by, bw + r * 2, bh);
+
+  // Radial glint — small hot spot at top-left cap, like a point light on curved glass
+  const gx = bx + r * 1.4, gy = by + r * 0.5;
+  const glint = tctx.createRadialGradient(gx, gy, 0, gx, gy, r * 1.2);
+  glint.addColorStop(0,    'rgba(255,255,255,0.42)');
+  glint.addColorStop(0.38, 'rgba(255,255,255,0.10)');
+  glint.addColorStop(1,    'rgba(255,255,255,0)');
+  tctx.fillStyle = glint;
+  tctx.fillRect(bx, by, bw, bh);
+
+  // Subtle bottom darkening — gives the sense of glass thickness
+  const floor = tctx.createLinearGradient(0, by + bh * 0.58, 0, by + bh);
+  floor.addColorStop(0, 'rgba(0,0,0,0)');
+  floor.addColorStop(1, 'rgba(0,0,0,0.09)');
+  tctx.fillStyle = floor;
+  tctx.fillRect(bx - r, by, bw + r * 2, bh);
+
+  tctx.restore();
+
+  // 3. Bright edge stroke — the glass rim
+  buildPath(tctx, bx, by, bw, bh);
+  tctx.strokeStyle = 'rgba(255,255,255,0.68)';
+  tctx.lineWidth   = 1.4;
+  tctx.stroke();
+}
+
 // ── Draw one bubble ───────────────────────────────────────────────
 function drawBubble(tctx, bx, by, bw, bh, color, tailLeft) {
   tctx.save();
   if (tailLeft) { tctx.translate(bx + bw, 0); tctx.scale(-1, 1); bx = 0; }
-  buildPath(tctx, bx, by, bw, bh);
-  if (mode === 'outline') {
+
+  if (mode === 'glass') {
+    drawGlassBubble(tctx, bx, by, bw, bh, color);
+  } else if (mode === 'outline') {
+    buildPath(tctx, bx, by, bw, bh);
     const [r,g,b] = hexToRgb(document.getElementById('strokeColor').value);
     const a = parseFloat(document.getElementById('strokeOpacity').value) / 100;
     tctx.strokeStyle = `rgba(${r},${g},${b},${a.toFixed(3)})`;
     tctx.lineWidth   = parseFloat(document.getElementById('strokeWidth').value);
     tctx.stroke();
   } else {
+    buildPath(tctx, bx, by, bw, bh);
     tctx.fillStyle = color;
     tctx.fill();
   }
+
   tctx.restore();
 }
 
@@ -370,9 +430,11 @@ function toggleAnim() {
 // ── Mode toggle ───────────────────────────────────────────────────
 function setMode(m) {
   mode = m;
-  document.getElementById('btn-fill').classList.toggle('on', m === 'fill');
+  document.getElementById('btn-fill').classList.toggle('on',    m === 'fill');
   document.getElementById('btn-outline').classList.toggle('on', m === 'outline');
-  document.getElementById('fillOpts').style.display    = m === 'fill'    ? 'flex' : 'none';
+  document.getElementById('btn-glass').classList.toggle('on',   m === 'glass');
+  // glass reuses fill color/opacity as the tint
+  document.getElementById('fillOpts').style.display    = (m === 'fill' || m === 'glass') ? 'flex' : 'none';
   document.getElementById('outlineOpts').style.display = m === 'outline' ? 'flex' : 'none';
   staticRender();
 }
