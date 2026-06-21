@@ -334,15 +334,18 @@ void ribbon(inout vec3 col, vec2 uv, float t,
     + amp        * sin(uv.x * freq          + ph)
     + amp * 0.18 * sin(uv.x * freq * 1.618  + ph * 0.73 + 1.1);
 
+  // Slope (first derivative) — computed early, drives both width and lighting
+  float dy = amp        * freq         * cos(uv.x * freq          + ph)
+           + amp * 0.18 * freq * 1.618  * cos(uv.x * freq * 1.618  + ph * 0.73 + 1.1);
+
+  // Twist narrowing: ribbon tilted edge-on appears thinner, like a physical ribbon
+  float tilt = 1.0 / sqrt(1.0 + dy * dy * 2.0);
   // Taper: subtly wider on the left (perspective cue)
-  float w    = baseW * uThickness * (1.2 - 0.28 * uv.x);
+  float w    = baseW * uThickness * tilt * (1.2 - 0.28 * uv.x);
   float dist = abs(uv.y - wy);
   float cov  = smoothstep(w, w * 0.04, dist);
   if (cov < 0.003) return;
 
-  // Slope (first derivative) → Lambertian-like lighting
-  float dy = amp        * freq         * cos(uv.x * freq          + ph)
-           + amp * 0.18 * freq * 1.618  * cos(uv.x * freq * 1.618  + ph * 0.73 + 1.1);
   float slope = abs(dy);
   float light = 1.0 - 0.22 * slope / (1.8 + slope);
 
@@ -363,7 +366,7 @@ void ribbon(inout vec3 col, vec2 uv, float t,
 
   // Soft glow halo in dark mode
   if (uDark == 1) {
-    float glow = smoothstep(baseW * uThickness * 4.5, 0.0, dist);
+    float glow = smoothstep(baseW * uThickness * tilt * 4.5, 0.0, dist);
     col += hsv2rgb(vec3(getHue(idx), 0.68, 0.26)) * glow * 0.22;
   }
 
