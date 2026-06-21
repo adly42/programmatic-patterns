@@ -47,6 +47,23 @@ Animated caustic light patterns — the shimmering interference lines you see on
 
 ---
 
+### [Particle Trace](particle-trace.html)
+
+upload any image and watch particles trace out its shape. the image becomes a brightness field, and particles flow through it using a blend of brightness-to-angle mapping (for fills) and gradient edge-following (to trace outlines). trails accumulate additively on a dark canvas. comes with a mandala flow field as the default before any image is loaded.
+
+**Controls:**
+- **Upload Image** — load any image as the particle flow field
+- **Invert** — flip bright/dark so particles trace dark shapes on white backgrounds (text, logos)
+- **Colors** — three color pickers for particle color assignment
+- **Recolor** — reassign all particles to the current color set instantly
+- **Particles** — count from 5k to 80k (default 30k)
+- **Speed** — particle velocity
+- **Fade** — trail persistence; slow = long glowing trails, fast = sharp short streaks
+- **Clear** — reset canvas to black
+- **Pause / PNG / Record** — standard export controls
+
+---
+
 ### [Glass Flame](glass-flame.html)
 
 double domain-warped fbm turbulence rendered with surface normals for specular highlights and iridescent edge shimmer. three modes: flame (deep red → orange → amber), glass (deep blue → aqua → ice), crystal (violet → magenta → rose-gold). the normal map drives a fresnel-based iridescent overlay and chromatic dispersion, giving the turbulence a glass-like surface quality.
