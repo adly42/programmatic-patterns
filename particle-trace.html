@@ -207,12 +207,13 @@ for (let i = 3; i < px.length; i += 4) px[i] = 255; // alpha
 
 // ---- Particle state ----
 const MAX_N = 80000;
-const pX = new Float32Array(MAX_N);
-const pY = new Float32Array(MAX_N);
-const pL = new Int32Array(MAX_N);  // life
-const pR = new Uint8Array(MAX_N);
-const pG = new Uint8Array(MAX_N);
-const pB = new Uint8Array(MAX_N);
+const pX  = new Float32Array(MAX_N);
+const pY  = new Float32Array(MAX_N);
+const pL  = new Int32Array(MAX_N);   // life
+const pCI = new Uint8Array(MAX_N);   // color index (0/1/2)
+const pR  = new Uint8Array(MAX_N);
+const pG  = new Uint8Array(MAX_N);
+const pB  = new Uint8Array(MAX_N);
 
 let N = 30000;
 let inverted = false;
@@ -250,6 +251,7 @@ function spawnP(i) {
   pX[i] = x; pY[i] = y;
   pL[i] = 60 + (Math.random() * 300) | 0;
   const ci = (Math.random() * colors.length) | 0;
+  pCI[i] = ci;
   pR[i] = colors[ci][0]; pG[i] = colors[ci][1]; pB[i] = colors[ci][2];
 }
 
@@ -335,10 +337,19 @@ function toggleInvert() {
   initParticles();
 }
 
+// Update all particles assigned to color slot n with its new value
+function applyColor(n) {
+  const [r, g, b] = colors[n];
+  for (let i = 0; i < MAX_N; i++) {
+    if (pCI[i] === n) { pR[i] = r; pG[i] = g; pB[i] = b; }
+  }
+}
+
 function recolor() {
   readColors();
   for (let i = 0; i < MAX_N; i++) {
     const ci = (Math.random() * colors.length) | 0;
+    pCI[i] = ci;
     pR[i] = colors[ci][0]; pG[i] = colors[ci][1]; pB[i] = colors[ci][2];
   }
 }
@@ -415,8 +426,11 @@ document.getElementById('sCount').addEventListener('input', () => {
   });
 });
 
-['c0','c1','c2'].forEach(id => {
-  document.getElementById(id).addEventListener('change', () => readColors());
+['c0','c1','c2'].forEach((id, n) => {
+  document.getElementById(id).addEventListener('input', () => {
+    colors[n] = hexToRgb(document.getElementById(id).value);
+    applyColor(n);
+  });
 });
 
 function togglePlay() {
