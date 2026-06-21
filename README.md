@@ -47,4 +47,18 @@ Animated caustic light patterns — the shimmering interference lines you see on
 
 ---
 
+### [Flow Ribbons](flow-ribbons.html)
+
+colored ribbon waves flowing across a 16:9 canvas. webgl2 fragment shader — each ribbon gets lambertian lighting from its slope, specular highlights at the bends, and an iridescent hue shift along the x-axis. light and dark backgrounds, 3 palettes, adjustable ribbon count.
+
+**Controls:**
+- **2 – 5** — number of ribbons
+- **Poly / Neon / Pastel** — color palette
+- **Light / Dark** — background mode
+- **Speed** — animation rate
+- **Save PNG** — export current frame
+- **Record** — export animated .webm video
+
+---
+
 More patterns coming.

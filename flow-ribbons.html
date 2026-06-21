@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flow Ribbons</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #111;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  padding: 16px;
+  gap: 14px;
+  overflow-y: auto;
+  transition: background 0.4s;
+}
+
+canvas {
+  display: block;
+  border-radius: 8px;
+  width: min(calc(100vw - 32px), calc((100vh - 220px) * 16 / 9));
+  aspect-ratio: 16 / 9;
+  flex-shrink: 0;
+}
+
+.panel {
+  background: rgba(255,255,255,0.055);
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 14px;
+  padding: 13px 16px;
+  width: min(calc(100vw - 32px), 640px);
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.lbl {
+  font-size: 11px;
+  color: rgba(255,255,255,0.35);
+  width: 82px;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+input[type=range] {
+  flex: 1;
+  min-width: 80px;
+  accent-color: rgba(255,255,255,0.55);
+  cursor: pointer;
+}
+
+.val {
+  font-size: 11px;
+  color: rgba(255,255,255,0.45);
+  font-variant-numeric: tabular-nums;
+  min-width: 30px;
+  text-align: right;
+}
+
+.seg {
+  display: flex;
+  gap: 1px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 8px;
+  padding: 3px;
+}
+
+.seg button {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.35);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.12s;
+  white-space: nowrap;
+}
+
+.seg button.active {
+  background: rgba(255,255,255,0.13);
+  color: rgba(255,255,255,0.85);
+}
+
+.seg button:hover:not(.active) {
+  color: rgba(255,255,255,0.6);
+}
+
+.btns {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 1px;
+}
+
+.btns button {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.09);
+  color: rgba(255,255,255,0.65);
+  padding: 5px 13px;
+  border-radius: 7px;
+  font-size: 11px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.12s;
+}
+
+.btns button:hover { background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.9); }
+.btns button.rec   { background: #ff3b30; border-color: #ff3b30; color: #fff; }
+
+.top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.title {
+  font-size: 11px;
+  color: rgba(255,255,255,0.28);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hr { height: 1px; background: rgba(255,255,255,0.07); margin: 1px 0; }
+</style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+
+<div class="panel">
+  <div class="top-row">
+    <span class="title">Flow Ribbons</span>
+    <div class="seg" id="seg-count">
+      <button data-v="2">2</button>
+      <button data-v="3" class="active">3</button>
+      <button data-v="4">4</button>
+      <button data-v="5">5</button>
+    </div>
+  </div>
+
+  <div class="hr"></div>
+
+  <div class="row">
+    <span class="lbl">Palette</span>
+    <div class="seg" id="seg-palette">
+      <button data-v="0" class="active">Poly</button>
+      <button data-v="1">Neon</button>
+      <button data-v="2">Pastel</button>
+    </div>
+  </div>
+
+  <div class="row">
+    <span class="lbl">Background</span>
+    <div class="seg" id="seg-bg">
+      <button data-v="0" class="active">Light</button>
+      <button data-v="1">Dark</button>
+    </div>
+  </div>
+
+  <div class="row">
+    <span class="lbl">Speed</span>
+    <input type="range" id="sSpeed" min="0" max="3" value="1" step="0.05">
+    <span class="val" id="vSpeed">1.00</span>
+  </div>
+
+  <div class="hr"></div>
+
+  <div class="btns">
+    <button id="btnPlay" onclick="togglePlay()">⏸ Pause</button>
+    <button onclick="savePng()">↓ PNG</button>
+    <button id="btnRec" onclick="toggleRecord()">⏺ Record</button>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const gl = canvas.getContext('webgl2', { preserveDrawingBuffer: true });
+if (!gl) {
+  document.body.innerHTML = '<p style="color:#fff;padding:40px;font-family:sans-serif">WebGL2 is required. Please use a modern browser.</p>';
+}
+
+// ---- State ----
+let playing = true;
+let elapsed = 0;
+let lastTs  = null;
+let count   = 3;
+let palette = 0;
+let darkBg  = 0;
+let mediaRecorder = null, recordChunks = [];
+
+// ---- Canvas pixel sizing ----
+const DPR = Math.min(devicePixelRatio, 2);
+
+// Set a known initial size immediately — avoids black-canvas on first rAF
+canvas.width  = 1280;
+canvas.height = 720;
+gl.viewport(0, 0, 1280, 720);
+
+function resizeCanvas() {
+  const w = Math.round(canvas.clientWidth  * DPR);
+  const h = Math.round(canvas.clientHeight * DPR);
+  if (w > 0 && h > 0 && (canvas.width !== w || canvas.height !== h)) {
+    canvas.width  = w;
+    canvas.height = h;
+    gl.viewport(0, 0, w, h);
+  }
+}
+new ResizeObserver(resizeCanvas).observe(canvas);
+resizeCanvas();
+
+// ---- Shaders ----
+const VS = `#version 300 es
+in vec2 aPos;
+void main() { gl_Position = vec4(aPos, 0.0, 1.0); }
+`;
+
+const FS = `#version 300 es
+precision highp float;
+out vec4 fragColor;
+
+uniform vec2  uRes;
+uniform float uTime;
+uniform float uSpeed;
+uniform int   uCount;
+uniform int   uPalette;
+uniform int   uDark;
+
+const float PI = 3.14159265;
+
+vec3 hsv2rgb(vec3 c) {
+  vec4 K = vec4(1.0, 2.0/3.0, 1.0/3.0, 3.0);
+  vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+  return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+}
+
+float getHue(int i) {
+  // Poly palette
+  if (uPalette == 0) {
+    if (i == 0) return 0.63;
+    if (i == 1) return 0.07;
+    if (i == 2) return 0.47;
+    if (i == 3) return 0.91;
+    return 0.27;
+  }
+  // Neon palette
+  if (uPalette == 1) {
+    if (i == 0) return 0.58;
+    if (i == 1) return 0.93;
+    if (i == 2) return 0.33;
+    if (i == 3) return 0.16;
+    return 0.76;
+  }
+  // Pastel palette
+  if (i == 0) return 0.70;
+  if (i == 1) return 0.05;
+  if (i == 2) return 0.45;
+  if (i == 3) return 0.87;
+  return 0.23;
+}
+
+void ribbon(inout vec3 col, vec2 uv, float t,
+            float cy, float amp, float freq,
+            float phOff, float spd, float baseW, int idx) {
+
+  float ph = t * spd + phOff;
+
+  // Wave: main sine + golden-ratio harmonic for organic shape
+  float wy = cy
+    + amp        * sin(uv.x * freq          + ph)
+    + amp * 0.18 * sin(uv.x * freq * 1.618  + ph * 0.73 + 1.1);
+
+  // Taper: subtly wider on the left (perspective cue)
+  float w    = baseW * (1.2 - 0.28 * uv.x);
+  float dist = abs(uv.y - wy);
+  float cov  = smoothstep(w, w * 0.04, dist);
+  if (cov < 0.003) return;
+
+  // Slope (first derivative) → Lambertian-like lighting
+  float dy = amp        * freq         * cos(uv.x * freq          + ph)
+           + amp * 0.18 * freq * 1.618  * cos(uv.x * freq * 1.618  + ph * 0.73 + 1.1);
+  float slope = abs(dy);
+  float light = 1.0 - 0.22 * slope / (1.8 + slope);
+
+  // Curvature (second derivative) → specular ridge at bends
+  float d2y = -amp        * freq * freq                      * sin(uv.x * freq          + ph)
+             - amp * 0.18 * freq * freq * 1.618 * 1.618       * sin(uv.x * freq * 1.618  + ph * 0.73 + 1.1);
+  float spec = smoothstep(0.8, 4.5, abs(d2y)) * cov * cov;
+
+  // Iridescent hue shift: hue drifts along x and with slope
+  float hue = getHue(idx) + uv.x * 0.07 + slope * 0.015;
+  float sat  = uDark == 1 ? 0.82 : 0.70;
+  float val  = uDark == 1
+    ? 0.60 + cov * 0.40 * light
+    : 0.55 + cov * 0.45 * light;
+
+  vec3 c = hsv2rgb(vec3(hue, sat, val));
+  c += vec3(spec * (uDark == 1 ? 0.48 : 0.28));
+
+  // Soft glow halo in dark mode
+  if (uDark == 1) {
+    float glow = smoothstep(baseW * 4.5, 0.0, dist);
+    col += hsv2rgb(vec3(getHue(idx), 0.68, 0.26)) * glow * 0.22;
+  }
+
+  col = mix(col, c, cov * 0.88);
+}
+
+void main() {
+  vec2  uv = gl_FragCoord.xy / uRes;
+  float t  = uTime * uSpeed * 0.28;
+
+  vec3 col = uDark == 1
+    ? vec3(0.05, 0.05, 0.07)
+    : vec3(0.98, 0.97, 0.96);
+
+  //                    cy     amp    freq      phOff  spd    baseW
+  if (uCount >= 1) ribbon(col, uv, t, 0.40, 0.22, PI*1.4, 0.00,  0.38, 0.058, 0);
+  if (uCount >= 2) ribbon(col, uv, t, 0.60, 0.19, PI*1.7, 2.10, -0.30, 0.050, 1);
+  if (uCount >= 3) ribbon(col, uv, t, 0.50, 0.15, PI*1.5, 4.20,  0.46, 0.042, 2);
+  if (uCount >= 4) ribbon(col, uv, t, 0.44, 0.12, PI*2.0, 1.05, -0.33, 0.035, 3);
+  if (uCount >= 5) ribbon(col, uv, t, 0.56, 0.17, PI*1.3, 3.15,  0.41, 0.050, 4);
+
+  fragColor = vec4(col, 1.0);
+}
+`;
+
+// ---- Compile + link ----
+function mkShader(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS))
+    console.error('Shader compile error:', gl.getShaderInfoLog(s));
+  return s;
+}
+const prog = gl.createProgram();
+gl.attachShader(prog, mkShader(gl.VERTEX_SHADER,   VS));
+gl.attachShader(prog, mkShader(gl.FRAGMENT_SHADER, FS));
+gl.linkProgram(prog);
+if (!gl.getProgramParameter(prog, gl.LINK_STATUS))
+  console.error('Link error:', gl.getProgramInfoLog(prog));
+gl.useProgram(prog);
+
+// ---- Fullscreen quad ----
+const buf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+const aPosLoc = gl.getAttribLocation(prog, 'aPos');
+gl.enableVertexAttribArray(aPosLoc);
+gl.vertexAttribPointer(aPosLoc, 2, gl.FLOAT, false, 0, 0);
+
+// ---- Uniform handles ----
+const U = {
+  res:   gl.getUniformLocation(prog, 'uRes'),
+  time:  gl.getUniformLocation(prog, 'uTime'),
+  speed: gl.getUniformLocation(prog, 'uSpeed'),
+  count: gl.getUniformLocation(prog, 'uCount'),
+  pal:   gl.getUniformLocation(prog, 'uPalette'),
+  dark:  gl.getUniformLocation(prog, 'uDark'),
+};
+
+// ---- Render loop ----
+function frame(ts) {
+  if (lastTs !== null && playing) elapsed += (ts - lastTs) / 1000;
+  lastTs = ts;
+
+  gl.uniform2f(U.res,   canvas.width, canvas.height);
+  gl.uniform1f(U.time,  elapsed);
+  gl.uniform1f(U.speed, parseFloat(document.getElementById('sSpeed').value));
+  gl.uniform1i(U.count, count);
+  gl.uniform1i(U.pal,   palette);
+  gl.uniform1i(U.dark,  darkBg);
+
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// ---- Segmented controls ----
+function setupSeg(id, cb) {
+  document.getElementById(id).addEventListener('click', e => {
+    const btn = e.target.closest('[data-v]');
+    if (!btn) return;
+    document.querySelectorAll(`#${id} button`).forEach(b =>
+      b.classList.toggle('active', b === btn));
+    cb(parseInt(btn.dataset.v));
+  });
+}
+setupSeg('seg-count',   v => { count = v; });
+setupSeg('seg-palette', v => { palette = v; });
+setupSeg('seg-bg', v => {
+  darkBg = v;
+  document.body.style.background = v === 1 ? '#111' : '#e8e4df';
+});
+
+document.getElementById('sSpeed').addEventListener('input', e =>
+  document.getElementById('vSpeed').textContent =
+    parseFloat(e.target.value).toFixed(2));
+
+// ---- Play / pause ----
+function togglePlay() {
+  playing = !playing;
+  if (playing) lastTs = null;
+  document.getElementById('btnPlay').textContent = playing ? '⏸ Pause' : '▶ Play';
+}
+
+// ---- PNG export ----
+function savePng() {
+  const a = document.createElement('a');
+  a.download = 'flow-ribbons.png';
+  a.href = canvas.toDataURL('image/png');
+  a.click();
+}
+
+// ---- Video export ----
+function toggleRecord() {
+  const btn = document.getElementById('btnRec');
+  if (!mediaRecorder) {
+    const mimeType = ['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm']
+      .find(m => MediaRecorder.isTypeSupported(m));
+    const stream = canvas.captureStream(30);
+    mediaRecorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000 });
+    recordChunks = [];
+    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordChunks.push(e.data); };
+    mediaRecorder.onstop = () => {
+      const blob = new Blob(recordChunks, { type: mimeType });
+      const a = document.createElement('a');
+      a.download = 'flow-ribbons.webm';
+      a.href = URL.createObjectURL(blob);
+      a.click();
+      URL.revokeObjectURL(a.href);
+      mediaRecorder = null;
+    };
+    mediaRecorder.start();
+    btn.textContent = '⏹ Stop';
+    btn.classList.add('rec');
+    if (!playing) togglePlay();
+  } else {
+    mediaRecorder.stop();
+    btn.textContent = '⏺ Record';
+    btn.classList.remove('rec');
+  }
+}
+</script>
+
+</body>
+</html>
