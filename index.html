@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Programmatic Patterns</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #0e0e0e;
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  min-height: 100vh;
+  padding: 48px 24px;
+}
+
+.header {
+  max-width: 680px;
+  margin: 0 auto 48px;
+}
+
+h1 {
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.35);
+  margin-bottom: 10px;
+}
+
+.subtitle {
+  font-size: 13px;
+  color: rgba(255,255,255,0.22);
+  line-height: 1.5;
+}
+
+.grid {
+  max-width: 680px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.card {
+  display: block;
+  text-decoration: none;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  padding: 20px 22px;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.card:hover {
+  background: rgba(255,255,255,0.07);
+  border-color: rgba(255,255,255,0.14);
+}
+
+.card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.card-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.85);
+}
+
+.card-arrow {
+  font-size: 14px;
+  color: rgba(255,255,255,0.2);
+  flex-shrink: 0;
+  margin-top: 1px;
+  transition: color 0.15s;
+}
+
+.card:hover .card-arrow {
+  color: rgba(255,255,255,0.5);
+}
+
+.card-desc {
+  font-size: 12px;
+  color: rgba(255,255,255,0.3);
+  line-height: 1.55;
+  margin-bottom: 12px;
+}
+
+.tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tag {
+  font-size: 10px;
+  color: rgba(255,255,255,0.3);
+  background: rgba(255,255,255,0.06);
+  border-radius: 4px;
+  padding: 2px 7px;
+  letter-spacing: 0.02em;
+}
+
+.footer {
+  max-width: 680px;
+  margin: 40px auto 0;
+  font-size: 11px;
+  color: rgba(255,255,255,0.15);
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Programmatic Patterns</h1>
+  <p class="subtitle">Generative HTML backgrounds. No build step, no dependencies — download any file and open it in a browser.</p>
+</div>
+
+<div class="grid">
+
+  <a class="card" href="bubble-message-background.html">
+    <div class="card-top">
+      <span class="card-title">Bubble Message Background</span>
+      <span class="card-arrow">↗</span>
+    </div>
+    <p class="card-desc">iMessage-style pill bubbles arranged in mirrored rows across a 1920×1080 canvas. Fill, outline, or liquid glass modes. Animated and exportable.</p>
+    <div class="tags">
+      <span class="tag">canvas 2D</span>
+      <span class="tag">bezier curves</span>
+      <span class="tag">animation</span>
+      <span class="tag">1920×1080</span>
+    </div>
+  </a>
+
+  <a class="card" href="cymatic-plates.html">
+    <div class="card-top">
+      <span class="card-title">Cymatic Plates</span>
+      <span class="card-arrow">↗</span>
+    </div>
+    <p class="card-desc">n-fold standing wave interference rendered with Bayer ordered dithering. Low frequency shows clear geometry; high frequency becomes film grain.</p>
+    <div class="tags">
+      <span class="tag">canvas 2D</span>
+      <span class="tag">wave math</span>
+      <span class="tag">bayer dither</span>
+      <span class="tag">animation</span>
+    </div>
+  </a>
+
+  <a class="card" href="caustics.html">
+    <div class="card-top">
+      <span class="card-title">Caustics</span>
+      <span class="card-arrow">↗</span>
+    </div>
+    <p class="card-desc">Animated caustic light patterns — the shimmering interference lines you see on a pool floor. Ported from a 146-character GLSL shader to a self-contained WebGL2 page.</p>
+    <div class="tags">
+      <span class="tag">webgl2</span>
+      <span class="tag">glsl</span>
+      <span class="tag">animation</span>
+    </div>
+  </a>
+
+</div>
+
+<p class="footer">github.com/adly42/programmatic-patterns</p>
+
+</body>
+</html>
