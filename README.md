@@ -47,6 +47,20 @@ Animated caustic light patterns — the shimmering interference lines you see on
 
 ---
 
+### [Glass Flame](glass-flame.html)
+
+double domain-warped fbm turbulence rendered with surface normals for specular highlights and iridescent edge shimmer. three modes: flame (deep red → orange → amber), glass (deep blue → aqua → ice), crystal (violet → magenta → rose-gold). the normal map drives a fresnel-based iridescent overlay and chromatic dispersion, giving the turbulence a glass-like surface quality.
+
+**Controls:**
+- **Flame / Glass / Crystal** — color palette
+- **Warp** — domain warp intensity; low = gentle ripples, high = chaotic turbulence
+- **Speed** — animation rate
+- **Glass** — blend in iridescent shimmer and specular strength
+- **Save PNG** — export current frame
+- **Record** — export animated .webm video
+
+---
+
 ### [Flow Ribbons](flow-ribbons.html)
 
 colored ribbon waves flowing across a 16:9 canvas. webgl2 fragment shader — each ribbon gets lambertian lighting from its slope, specular highlights at the bends, and an iridescent hue shift along the x-axis. light and dark backgrounds, 3 palettes, adjustable ribbon count.
