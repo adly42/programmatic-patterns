@@ -171,6 +171,11 @@ input[type=color]::-webkit-color-swatch {
       <button data-v="3" class="active">3</button>
       <button data-v="4">4</button>
       <button data-v="5">5</button>
+      <button data-v="6">6</button>
+      <button data-v="7">7</button>
+      <button data-v="8">8</button>
+      <button data-v="9">9</button>
+      <button data-v="10">10</button>
     </div>
   </div>
 
@@ -184,6 +189,11 @@ input[type=color]::-webkit-color-swatch {
       <input type="color" class="ribbon-color" data-i="2" value="#28e1bf" title="Ribbon 3">
       <input type="color" class="ribbon-color" data-i="3" value="#e1288c" title="Ribbon 4">
       <input type="color" class="ribbon-color" data-i="4" value="#6ee128" title="Ribbon 5">
+      <input type="color" class="ribbon-color" data-i="5" value="#e1c328" title="Ribbon 6">
+      <input type="color" class="ribbon-color" data-i="6" value="#d228e1" title="Ribbon 7">
+      <input type="color" class="ribbon-color" data-i="7" value="#28a9e1" title="Ribbon 8">
+      <input type="color" class="ribbon-color" data-i="8" value="#28e15c" title="Ribbon 9">
+      <input type="color" class="ribbon-color" data-i="9" value="#e13e28" title="Ribbon 10">
     </div>
   </div>
 
@@ -229,7 +239,7 @@ let elapsed = 0;
 let lastTs  = null;
 let count   = 3;
 let darkBg  = 0;
-let hues    = [0.63, 0.07, 0.47, 0.91, 0.27]; // matching initial color picker values
+let hues    = [0.63, 0.07, 0.47, 0.91, 0.27, 0.14, 0.82, 0.55, 0.38, 0.02]; // matching color picker values
 let mediaRecorder = null, recordChunks = [];
 
 function hexToHue(hex) {
@@ -285,6 +295,11 @@ uniform float uHue1;
 uniform float uHue2;
 uniform float uHue3;
 uniform float uHue4;
+uniform float uHue5;
+uniform float uHue6;
+uniform float uHue7;
+uniform float uHue8;
+uniform float uHue9;
 uniform float uThickness;
 
 const float PI = 3.14159265;
@@ -300,7 +315,12 @@ float getHue(int i) {
   if (i == 1) return uHue1;
   if (i == 2) return uHue2;
   if (i == 3) return uHue3;
-  return uHue4;
+  if (i == 4) return uHue4;
+  if (i == 5) return uHue5;
+  if (i == 6) return uHue6;
+  if (i == 7) return uHue7;
+  if (i == 8) return uHue8;
+  return uHue9;
 }
 
 void ribbon(inout vec3 col, vec2 uv, float t,
@@ -363,7 +383,12 @@ void main() {
   if (uCount >= 2) ribbon(col, uv, t, 0.60, 0.19, PI*1.7, 2.10, -0.30, 0.050, 1);
   if (uCount >= 3) ribbon(col, uv, t, 0.50, 0.15, PI*1.5, 4.20,  0.46, 0.042, 2);
   if (uCount >= 4) ribbon(col, uv, t, 0.44, 0.12, PI*2.0, 1.05, -0.33, 0.035, 3);
-  if (uCount >= 5) ribbon(col, uv, t, 0.56, 0.17, PI*1.3, 3.15,  0.41, 0.050, 4);
+  if (uCount >= 5)  ribbon(col, uv, t, 0.56, 0.17, PI*1.3, 3.15,  0.41, 0.050, 4);
+  if (uCount >= 6)  ribbon(col, uv, t, 0.35, 0.20, PI*1.6, 5.50, -0.35, 0.045, 5);
+  if (uCount >= 7)  ribbon(col, uv, t, 0.65, 0.14, PI*1.9, 0.70,  0.52, 0.038, 6);
+  if (uCount >= 8)  ribbon(col, uv, t, 0.48, 0.18, PI*2.2, 2.80, -0.42, 0.046, 7);
+  if (uCount >= 9)  ribbon(col, uv, t, 0.55, 0.11, PI*1.2, 1.40,  0.36, 0.032, 8);
+  if (uCount >= 10) ribbon(col, uv, t, 0.42, 0.16, PI*2.4, 3.80, -0.28, 0.044, 9);
 
   fragColor = vec4(col, 1.0);
 }
@@ -406,6 +431,11 @@ const U = {
   hue2:  gl.getUniformLocation(prog, 'uHue2'),
   hue3:  gl.getUniformLocation(prog, 'uHue3'),
   hue4:  gl.getUniformLocation(prog, 'uHue4'),
+  hue5:  gl.getUniformLocation(prog, 'uHue5'),
+  hue6:  gl.getUniformLocation(prog, 'uHue6'),
+  hue7:  gl.getUniformLocation(prog, 'uHue7'),
+  hue8:  gl.getUniformLocation(prog, 'uHue8'),
+  hue9:  gl.getUniformLocation(prog, 'uHue9'),
   thick: gl.getUniformLocation(prog, 'uThickness'),
 };
 
@@ -424,6 +454,11 @@ function frame(ts) {
   gl.uniform1f(U.hue2,  hues[2]);
   gl.uniform1f(U.hue3,  hues[3]);
   gl.uniform1f(U.hue4,  hues[4]);
+  gl.uniform1f(U.hue5,  hues[5]);
+  gl.uniform1f(U.hue6,  hues[6]);
+  gl.uniform1f(U.hue7,  hues[7]);
+  gl.uniform1f(U.hue8,  hues[8]);
+  gl.uniform1f(U.hue9,  hues[9]);
   gl.uniform1f(U.thick, parseFloat(document.getElementById('sThick').value));
 
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
