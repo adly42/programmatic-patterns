@@ -8,7 +8,7 @@ A collection of generative HTML backgrounds. Each file is fully self-contained �
 
 ### [Bubble Message Background](bubble-message-background.html)
 
-Fills a 1920×1080 canvas with iMessage-style pill bubbles of varying widths, arranged in rows. Every second row is mirrored so the tails face opposite directions. Built from a real iMessage bubble SVG path, so the tail shape and proportions are accurate.
+iMessage-style pill bubbles in rows across a 1920×1080 canvas. every other row flips so the tails face opposite directions. built from a real iMessage bubble SVG path. fill, outline, or liquid glass modes.
 
 **Controls:**
 - **Fill / Outline / Glass** — toggle between filled, outline-only, and liquid glass bubbles
@@ -23,7 +23,7 @@ Fills a 1920×1080 canvas with iMessage-style pill bubbles of varying widths, ar
 
 ### [Cymatic Plates](cymatic-plates.html)
 
-Renders n-fold standing wave interference patterns using Bayer ordered dithering, producing a beautiful film-grain aesthetic. Based on the physics of Chladni plates — the bright regions are wave anti-nodes, dark lines are the nodes where sand would collect on a real vibrating plate.
+n-fold standing wave interference patterns rendered with Bayer ordered dithering. low frequency shows clear geometry. crank it up and it becomes film grain. based on the physics of Chladni plates.
 
 **Controls:**
 - **2× – 12×** — fold symmetry (2=striped, 3=triangular, 6=hexagonal, 8=octagonal...)
