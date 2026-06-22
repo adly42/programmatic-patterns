@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cellular</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #080508;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  padding: 16px;
+  gap: 14px;
+  overflow-y: auto;
+}
+
+canvas {
+  display: block;
+  border-radius: 8px;
+  width: min(calc(100vw - 32px), calc((100vh - 220px) * 16 / 9));
+  aspect-ratio: 16 / 9;
+  flex-shrink: 0;
+}
+
+.panel {
+  background: rgba(255,255,255,0.055);
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 14px;
+  padding: 13px 16px;
+  width: min(calc(100vw - 32px), 640px);
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lbl {
+  font-size: 11px;
+  color: rgba(255,255,255,0.35);
+  width: 72px;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+input[type=range] {
+  flex: 1;
+  accent-color: rgba(255,255,255,0.55);
+  cursor: pointer;
+  height: 3px;
+}
+
+.val {
+  font-size: 11px;
+  color: rgba(255,255,255,0.45);
+  font-variant-numeric: tabular-nums;
+  min-width: 30px;
+  text-align: right;
+}
+
+.btns {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 1px;
+}
+
+.btns button {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.09);
+  color: rgba(255,255,255,0.65);
+  padding: 5px 13px;
+  border-radius: 7px;
+  font-size: 11px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.12s;
+}
+
+.btns button:hover { background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.9); }
+.btns button.rec   { background: #ff3b30; border-color: #ff3b30; color: #fff; }
+
+.top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.title {
+  font-size: 11px;
+  color: rgba(255,255,255,0.28);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hr { height: 1px; background: rgba(255,255,255,0.07); margin: 1px 0; }
+</style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+
+<div class="panel">
+  <div class="top-row">
+    <span class="title">Cellular</span>
+  </div>
+
+  <div class="hr"></div>
+
+  <div class="row">
+    <span class="lbl">Cells</span>
+    <input type="range" id="sCells" min="4" max="36" value="16" step="1">
+    <span class="val" id="vCells">16</span>
+  </div>
+  <div class="row">
+    <span class="lbl">Speed</span>
+    <input type="range" id="sSpeed" min="0" max="2" value="0.35" step="0.05">
+    <span class="val" id="vSpeed">0.35</span>
+  </div>
+  <div class="row">
+    <span class="lbl">Border</span>
+    <input type="range" id="sBorder" min="1" max="10" value="4" step="1">
+    <span class="val" id="vBorder">4</span>
+  </div>
+  <div class="row">
+    <span class="lbl">Hue Shift</span>
+    <input type="range" id="sHue" min="0" max="100" value="0" step="1">
+    <span class="val" id="vHue">0</span>
+  </div>
+  <div class="row">
+    <span class="lbl">Saturation</span>
+    <input type="range" id="sSat" min="20" max="100" value="70" step="1">
+    <span class="val" id="vSat">70</span>
+  </div>
+
+  <div class="hr"></div>
+
+  <div class="btns">
+    <button id="btnPlay" onclick="togglePlay()">⏸ Pause</button>
+    <button onclick="savePng()">↓ PNG</button>
+    <button id="btnRec" onclick="toggleRecord()">⏺ Record</button>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const gl = canvas.getContext('webgl2', { preserveDrawingBuffer: true });
+if (!gl) {
+  document.body.innerHTML = '<p style="color:#fff;padding:40px;font-family:sans-serif">WebGL2 is required.</p>';
+}
+
+let playing = true, elapsed = 0, lastTs = null;
+
+const MAX_SEEDS = 40;
+const seedPos = new Float32Array(MAX_SEEDS * 2);
+const seedVel = new Float32Array(MAX_SEEDS * 2);
+
+// Initialize random positions and small velocities
+for (let i = 0; i < MAX_SEEDS; i++) {
+  seedPos[i * 2]     = Math.random();
+  seedPos[i * 2 + 1] = Math.random();
+  const angle = Math.random() * Math.PI * 2;
+  const spd   = 0.04 + Math.random() * 0.06;
+  seedVel[i * 2]     = Math.cos(angle) * spd;
+  seedVel[i * 2 + 1] = Math.sin(angle) * spd;
+}
+
+let lastSimTs = null;
+
+function stepSeeds(ts, speed) {
+  if (lastSimTs === null) { lastSimTs = ts; return; }
+  const dt = Math.min((ts - lastSimTs) / 1000, 0.05);
+  lastSimTs = ts;
+  for (let i = 0; i < MAX_SEEDS; i++) {
+    seedPos[i * 2]     += seedVel[i * 2]     * speed * dt;
+    seedPos[i * 2 + 1] += seedVel[i * 2 + 1] * speed * dt;
+    // Wrap [0,1]
+    seedPos[i * 2]     = ((seedPos[i * 2]     % 1) + 1) % 1;
+    seedPos[i * 2 + 1] = ((seedPos[i * 2 + 1] % 1) + 1) % 1;
+  }
+}
+
+const DPR = Math.min(devicePixelRatio, 2);
+canvas.width  = 1280;
+canvas.height = 720;
+gl.viewport(0, 0, 1280, 720);
+
+function resizeCanvas() {
+  const w = Math.round(canvas.clientWidth  * DPR);
+  const h = Math.round(canvas.clientHeight * DPR);
+  if (w > 0 && h > 0 && (canvas.width !== w || canvas.height !== h)) {
+    canvas.width  = w;
+    canvas.height = h;
+    gl.viewport(0, 0, w, h);
+  }
+}
+new ResizeObserver(resizeCanvas).observe(canvas);
+resizeCanvas();
+
+// ---- Shaders ----
+const VS = `#version 300 es
+in vec2 aPos;
+void main() { gl_Position = vec4(aPos, 0.0, 1.0); }
+`;
+
+const FS = `#version 300 es
+precision highp float;
+out vec4 fragColor;
+
+uniform vec2  uRes;
+uniform vec2  uSeeds[40];
+uniform int   uCount;
+uniform float uBorder;
+uniform float uHueShift;
+uniform float uSat;
+
+vec3 hsv2rgb(vec3 c) {
+  vec4 K = vec4(1.0, 2.0/3.0, 1.0/3.0, 3.0);
+  vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+  return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+}
+
+// Toroidal distance (wrapping)
+float wrapLen(vec2 a, vec2 b) {
+  vec2 d = abs(a - b);
+  d = min(d, 1.0 - d);
+  return length(d);
+}
+
+void main() {
+  vec2 uv = gl_FragCoord.xy / uRes;
+  // Correct for aspect ratio in voronoi space — use [0,1] UV directly
+  // so seeds animate uniformly; we visualise in screen space but distance
+  // is computed in a normalised square so that cells don't stretch
+  float aspect = uRes.x / uRes.y;
+  vec2 p = vec2(uv.x, uv.y);
+
+  float d1 = 1e9, d2 = 1e9;
+  int nearIdx = 0;
+  for (int i = 0; i < 40; i++) {
+    if (i >= uCount) break;
+    // Convert seed from [0,1]² to screen-aspect space for distance
+    vec2 seedScreen = vec2(uSeeds[i].x, uSeeds[i].y);
+    float dx = abs(p.x - seedScreen.x); dx = min(dx, 1.0 - dx);
+    float dy = abs(p.y - seedScreen.y); dy = min(dy, 1.0 - dy);
+    // Weight x by aspect so circles are round on screen
+    float d = length(vec2(dx * aspect, dy));
+    if (d < d1) { d2 = d1; d1 = d; nearIdx = i; }
+    else if (d < d2) d2 = d;
+  }
+
+  float hue = fract(float(nearIdx) * 0.6180339 + uHueShift);
+  float brightness = max(0.25, 1.0 - d1 * 4.5);
+  vec3 cellCol = hsv2rgb(vec3(hue, uSat, brightness));
+
+  float border = smoothstep(0.0, uBorder, (d2 - d1) * float(uCount));
+  float glow = exp(-d1 * 50.0) * 0.35;
+  vec3 col = cellCol * border + vec3(glow * 0.6);
+
+  fragColor = vec4(col, 1.0);
+}
+`;
+
+function mkShader(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS))
+    console.error('Shader error:', gl.getShaderInfoLog(s));
+  return s;
+}
+
+const prog = gl.createProgram();
+gl.attachShader(prog, mkShader(gl.VERTEX_SHADER,   VS));
+gl.attachShader(prog, mkShader(gl.FRAGMENT_SHADER, FS));
+gl.linkProgram(prog);
+if (!gl.getProgramParameter(prog, gl.LINK_STATUS))
+  console.error('Link error:', gl.getProgramInfoLog(prog));
+gl.useProgram(prog);
+
+const buf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+const aPos = gl.getAttribLocation(prog, 'aPos');
+gl.enableVertexAttribArray(aPos);
+gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+const U = {
+  res:      gl.getUniformLocation(prog, 'uRes'),
+  seeds:    gl.getUniformLocation(prog, 'uSeeds'),
+  count:    gl.getUniformLocation(prog, 'uCount'),
+  border:   gl.getUniformLocation(prog, 'uBorder'),
+  hueShift: gl.getUniformLocation(prog, 'uHueShift'),
+  sat:      gl.getUniformLocation(prog, 'uSat'),
+};
+
+function frame(ts) {
+  const speed = parseFloat(document.getElementById('sSpeed').value);
+  if (playing) stepSeeds(ts, speed);
+  if (lastTs !== null && playing) elapsed += (ts - lastTs) / 1000;
+  lastTs = ts;
+
+  const count  = parseInt(document.getElementById('sCells').value);
+  const border = parseInt(document.getElementById('sBorder').value) * 0.004;
+  const hue    = parseInt(document.getElementById('sHue').value) / 100.0;
+  const sat    = parseInt(document.getElementById('sSat').value) / 100.0;
+
+  gl.uniform2f(U.res, canvas.width, canvas.height);
+  gl.uniform2fv(U.seeds, seedPos);
+  gl.uniform1i(U.count, count);
+  gl.uniform1f(U.border, border);
+  gl.uniform1f(U.hueShift, hue);
+  gl.uniform1f(U.sat, sat);
+
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// ---- Controls ----
+[
+  ['sCells',  'vCells',  0],
+  ['sSpeed',  'vSpeed',  2],
+  ['sBorder', 'vBorder', 0],
+  ['sHue',    'vHue',    0],
+  ['sSat',    'vSat',    0],
+].forEach(([sid, vid, dp]) => {
+  document.getElementById(sid).addEventListener('input', () => {
+    document.getElementById(vid).textContent =
+      parseFloat(document.getElementById(sid).value).toFixed(dp);
+  });
+});
+
+function togglePlay() {
+  playing = !playing;
+  if (playing) { lastTs = null; lastSimTs = null; }
+  document.getElementById('btnPlay').textContent = playing ? '⏸ Pause' : '▶ Play';
+}
+
+function savePng() {
+  const a = document.createElement('a');
+  a.download = 'cellular.png';
+  a.href = canvas.toDataURL('image/png');
+  a.click();
+}
+
+let mediaRecorder2 = null, recordChunks2 = [];
+function toggleRecord() {
+  const btn = document.getElementById('btnRec');
+  if (!mediaRecorder2) {
+    const mimeType = ['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm']
+      .find(m => MediaRecorder.isTypeSupported(m));
+    const stream = canvas.captureStream(30);
+    mediaRecorder2 = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000 });
+    recordChunks2 = [];
+    mediaRecorder2.ondataavailable = e => { if (e.data.size > 0) recordChunks2.push(e.data); };
+    mediaRecorder2.onstop = () => {
+      const blob = new Blob(recordChunks2, { type: mimeType });
+      const a = document.createElement('a');
+      a.download = 'cellular.webm';
+      a.href = URL.createObjectURL(blob);
+      a.click();
+      URL.revokeObjectURL(a.href);
+      mediaRecorder2 = null;
+    };
+    mediaRecorder2.start();
+    btn.textContent = '⏹ Stop';
+    btn.classList.add('rec');
+    if (!playing) togglePlay();
+  } else {
+    mediaRecorder2.stop();
+    btn.textContent = '⏺ Record';
+    btn.classList.remove('rec');
+  }
+}
+</script>
+
+</body>
+</html>

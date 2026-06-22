@@ -64,6 +64,46 @@ upload any image and watch particles trace out its shape. the image becomes a br
 
 ---
 
+### [Truchet Tiles](truchet-tiles.html)
+
+quarter-circle arc tiles that flip between two configurations driven by animated FBM noise. large organic blobs of each configuration drift slowly across the grid. anti-aliased arcs with tube highlights and a soft glow.
+
+**Controls:**
+- **Line / Background** — two color pickers for arc and fill colors
+- **Scale** — grid density, 3 to 28 tiles across
+- **Thickness** — arc tube width
+- **Speed** — how fast the FBM noise field drifts
+- **Pause / PNG / Record** — standard export controls
+
+---
+
+### [Cellular](cellular.html)
+
+animated Voronoi cellular noise. N seeds wander the canvas with toroidal wrapping so nothing ever clips at the edges. each cell is colored by its seed index using the golden-ratio hue trick, with a glowing border where cells meet.
+
+**Controls:**
+- **Cells** — number of seeds (4 to 36)
+- **Speed** — seed velocity
+- **Border** — width of the boundary glow between cells
+- **Hue Shift** — rotate the entire color wheel
+- **Saturation** — from muted pastels to fully saturated
+- **Pause / PNG / Record** — standard export controls
+
+---
+
+### [Gyroid](gyroid.html)
+
+raymarched gyroid isosurface rendered in WebGL2. the gyroid is a triply periodic minimal surface — a structure that tiles infinitely in all three dimensions. an orbiting camera circles the surface while Phong lighting (key, fill, and rim) brings out the saddle-shaped geometry.
+
+**Controls:**
+- **Surface / Background** — two color pickers
+- **Scale** — spatial frequency of the gyroid lattice (5–30)
+- **Thickness** — shell width of the rendered isosurface
+- **Speed** — camera orbit rate
+- **Pause / PNG / Record** — standard export controls
+
+---
+
 ### [Glass Flame](glass-flame.html)
 
 double domain-warped fbm turbulence rendered with surface normals for specular highlights and iridescent edge shimmer. three modes: flame (deep red → orange → amber), glass (deep blue → aqua → ice), crystal (violet → magenta → rose-gold). the normal map drives a fresnel-based iridescent overlay and chromatic dispersion, giving the turbulence a glass-like surface quality.
