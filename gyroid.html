@@ -156,6 +156,11 @@ input[type=color]::-webkit-color-swatch {
     <span class="val" id="vThick">8</span>
   </div>
   <div class="row">
+    <span class="lbl">Glow</span>
+    <input type="range" id="sGlow" min="0" max="100" value="25" step="1">
+    <span class="val" id="vGlow">25</span>
+  </div>
+  <div class="row">
     <span class="lbl">Speed</span>
     <input type="range" id="sSpeed" min="0" max="2" value="0.5" step="0.05">
     <span class="val" id="vSpeed">0.50</span>
@@ -219,6 +224,7 @@ uniform float uTime;
 uniform float uSpeed;
 uniform float uScale;
 uniform float uThick;
+uniform float uGlow;
 uniform vec3  uColorA; // surface
 uniform vec3  uColorB; // background
 
@@ -284,7 +290,7 @@ void main() {
     float spec = pow(max(0.0, dot(N, H)), 48.0) * 0.7;
 
     // Rim light
-    float rim = pow(1.0 - max(0.0, dot(N, V)), 3.0) * 0.25;
+    float rim = pow(1.0 - max(0.0, dot(N, V)), 3.0) * uGlow;
 
     vec3 baseCol = uColorA;
     col = baseCol * (0.08 + diff * 0.85) + vec3(spec) + baseCol * rim;
@@ -331,6 +337,7 @@ const U = {
   speed:  gl.getUniformLocation(prog, 'uSpeed'),
   scale:  gl.getUniformLocation(prog, 'uScale'),
   thick:  gl.getUniformLocation(prog, 'uThick'),
+  glow:   gl.getUniformLocation(prog, 'uGlow'),
   colorA: gl.getUniformLocation(prog, 'uColorA'),
   colorB: gl.getUniformLocation(prog, 'uColorB'),
 };
@@ -344,12 +351,14 @@ function frame(ts) {
   const scale = parseFloat(document.getElementById('sScale').value) * 0.1;
   const thick = parseFloat(document.getElementById('sThick').value) * 0.015;
   const speed = parseFloat(document.getElementById('sSpeed').value);
+  const glow  = parseFloat(document.getElementById('sGlow').value) * 0.008;
 
   gl.uniform2f(U.res,   canvas.width, canvas.height);
   gl.uniform1f(U.time,  elapsed);
   gl.uniform1f(U.speed, speed);
   gl.uniform1f(U.scale, scale);
   gl.uniform1f(U.thick, thick);
+  gl.uniform1f(U.glow,  glow);
   gl.uniform3f(U.colorA, ca[0], ca[1], ca[2]);
   gl.uniform3f(U.colorB, cb[0], cb[1], cb[2]);
 
@@ -362,6 +371,7 @@ requestAnimationFrame(frame);
 [
   ['sScale', 'vScale', 0],
   ['sThick', 'vThick', 0],
+  ['sGlow',  'vGlow',  0],
   ['sSpeed', 'vSpeed', 2],
 ].forEach(([sid, vid, dp]) => {
   document.getElementById(sid).addEventListener('input', () => {
