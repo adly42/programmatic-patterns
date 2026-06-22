@@ -132,4 +132,18 @@ colored ribbon waves flowing across a 16:9 canvas. webgl2 fragment shader — ea
 
 ---
 
+### [Lissajous](lissajous.html)
+
+parametric curves `x = sin(a·t + δ), y = sin(b·t)` animated by slowly drifting the phase δ. the figure morphs continuously between every shape the frequency ratio allows. three-pass neon glow (outer halo + mid bloom + bright core) via Canvas 2D screen blending accumulates on a dark canvas with a trail fade.
+
+**Controls:**
+- **Color** — pick the line color
+- **Freq A / Freq B** — horizontal and vertical frequency; changing either clears the canvas and snaps to the new figure
+- **Speed** — how fast the phase δ animates (0 = frozen)
+- **Trail** — how long old curve positions persist (1 = short decay, 10 = long persistence)
+- **Width** — line thickness and glow size
+- **Clear / Pause / PNG / Record** — standard export controls
+
+---
+
 More patterns coming.
