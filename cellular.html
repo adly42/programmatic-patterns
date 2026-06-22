@@ -154,6 +154,11 @@ input[type=color]::-webkit-color-swatch {
     <span class="val" id="vBorder">4</span>
   </div>
   <div class="row">
+    <span class="lbl">Glow</span>
+    <input type="range" id="sGlow" min="0" max="100" value="35" step="1">
+    <span class="val" id="vGlow">35</span>
+  </div>
+  <div class="row">
     <span class="lbl">Colors</span>
     <input type="color" id="c0" value="#e87a7a">
     <input type="color" id="c1" value="#7ab0e8">
@@ -238,6 +243,7 @@ uniform vec2  uRes;
 uniform vec2  uSeeds[40];
 uniform int   uCount;
 uniform float uBorder;
+uniform float uGlow;
 uniform vec3  uColors[3];
 
 // Toroidal distance (wrapping)
@@ -273,7 +279,7 @@ void main() {
   vec3 cellCol = uColors[nearIdx % 3] * brightness;
 
   float border = smoothstep(0.0, uBorder, (d2 - d1) * float(uCount));
-  float glow = exp(-d1 * 50.0) * 0.35;
+  float glow = exp(-d1 * 50.0) * uGlow;
   vec3 col = cellCol * border + vec3(glow * 0.6);
 
   fragColor = vec4(col, 1.0);
@@ -309,6 +315,7 @@ const U = {
   seeds:  gl.getUniformLocation(prog, 'uSeeds'),
   count:  gl.getUniformLocation(prog, 'uCount'),
   border: gl.getUniformLocation(prog, 'uBorder'),
+  glow:   gl.getUniformLocation(prog, 'uGlow'),
   colors: gl.getUniformLocation(prog, 'uColors[0]'),
 };
 
@@ -331,11 +338,13 @@ function frame(ts) {
 
   const count  = parseInt(document.getElementById('sCells').value);
   const border = parseInt(document.getElementById('sBorder').value) * 0.004;
+  const glow   = parseInt(document.getElementById('sGlow').value) / 100.0;
 
   gl.uniform2f(U.res, canvas.width, canvas.height);
   gl.uniform2fv(U.seeds, seedPos);
   gl.uniform1i(U.count, count);
   gl.uniform1f(U.border, border);
+  gl.uniform1f(U.glow, glow);
   gl.uniform3fv(U.colors, readColors());
 
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
@@ -348,6 +357,7 @@ requestAnimationFrame(frame);
   ['sCells',  'vCells',  0],
   ['sSpeed',  'vSpeed',  2],
   ['sBorder', 'vBorder', 0],
+  ['sGlow',   'vGlow',   0],
 ].forEach(([sid, vid, dp]) => {
   document.getElementById(sid).addEventListener('input', () => {
     document.getElementById(vid).textContent =
