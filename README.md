@@ -2,6 +2,8 @@
 
 A collection of generative HTML backgrounds. Each file is fully self-contained — no build step, no dependencies. Download and open in any browser.
 
+**[View live → adly42.github.io/programmatic-patterns](https://adly42.github.io/programmatic-patterns/)**
+
 ---
 
 ## Patterns
